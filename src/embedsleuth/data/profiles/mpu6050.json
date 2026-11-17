@@ -1,0 +1,57 @@
+{
+  "schema_version": "1.0",
+  "profile_id": "mpu6050",
+  "version": "0.1.0",
+  "manufacturer": "InvenSense",
+  "component": "MPU-6050",
+  "scope": "ic",
+  "review_status": "reviewed",
+  "reviewed_on": "2026-11-17",
+  "review_notes": "Document review of identity, address, VDD and bus constraints only; not hardware qualification. Manufacturer-authored public distribution copies were downloaded, document numbers/revisions and cited sections inspected, and original bytes hashed. Single-byte combined register read is described in PS section 9.3, page 35. WHO_AM_I is read-only, not a FIFO or read-to-clear interrupt register. Module circuit and VLOGIC conditions remain deployment-specific.",
+  "sources": [
+    {
+      "source_id": "mpu-register-map",
+      "document_number": "RM-MPU-6000A-00",
+      "revision": "4.2",
+      "publisher": "InvenSense Inc.",
+      "original_url": "https://invensense.tdk.com/wp-content/uploads/2015/02/MPU-6000-Register-Map1.pdf",
+      "retrieved_url": "https://www.komputer.de/wordpress/wp-content/uploads/2023/06/MPU-6000.pdf",
+      "retrieved_on": "2026-11-17",
+      "sha256": "7a628250765bbc4f5eae85fcadc40c8aa9770dba34a5c0fb54df91c537639ebd"
+    },
+    {
+      "source_id": "mpu-product-spec",
+      "document_number": "PS-MPU-6000A-00",
+      "revision": "3.4",
+      "publisher": "InvenSense Inc.",
+      "original_url": "https://product.tdk.com/system/files/dam/doc/product/sensor/mortion-inertial/imu/data_sheet/mpu-6000-datasheet1.pdf",
+      "retrieved_url": "https://cdn.sparkfun.com/assets/a/4/6/8/e/MPU_6050.pdf",
+      "retrieved_on": "2026-11-17",
+      "sha256": "a4fdf69590b8cbab1cf0a5bcd359327b0ac022061fb233855aff2e191e7e3584"
+    }
+  ],
+  "addresses": [104, 105],
+  "address_citation": {"source_id": "mpu-product-spec", "section": "6.4", "page": 15},
+  "identity": {
+    "register_address": 117,
+    "length": 1,
+    "expected": 104,
+    "mask": 255,
+    "access": "read_only",
+    "read_side_effect": "register_pointer_only",
+    "citation": {"source_id": "mpu-register-map", "section": "4.32", "page": 45}
+  },
+  "supply": {
+    "minimum_v": 2.375,
+    "maximum_v": 3.46,
+    "citation": {"source_id": "mpu-product-spec", "section": "6.3", "page": 14}
+  },
+  "max_i2c_hz": 400000,
+  "bus_citation": {"source_id": "mpu-product-spec", "section": "6.4", "page": 15},
+  "limitations": [
+    "IC-level profile; breakout-board regulator, pull-ups, VLOGIC wiring and electrical compatibility are not inferred.",
+    "Identity match does not establish authenticity, measurement accuracy or healthy wiring.",
+    "Address and register-pointer selection involve bus writes within the approved read transaction; no configuration-register writes are authorized.",
+    "Unknown devices at the same address and concurrent bus users require deployment checks before a probe."
+  ]
+}
