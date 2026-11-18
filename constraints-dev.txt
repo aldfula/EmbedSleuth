@@ -1,4 +1,4 @@
-# Verified on Linux x86_64 / Python 3.12.14, 2026-11-17.
+# Verified on Linux x86_64 / Python 3.12.14, 2026-11-18.
 # Runtime + test dependencies; build isolation resolves setuptools separately.
 annotated-types==0.8.0
 iniconfig==2.3.1
@@ -10,3 +10,10 @@ pygments==2.21.0
 pytest==9.2.0
 typing-extensions==4.16.0
 typing-inspection==0.4.5
+bcrypt==5.0.0
+cffi==2.1.1
+cryptography==50.0.2
+invoke==3.0.3
+paramiko==4.0.0
+pycparser==3.12
+PyNaCl==1.6.2

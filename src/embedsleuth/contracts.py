@@ -8,9 +8,10 @@ from __future__ import annotations
 from datetime import datetime, timedelta
 from typing import Annotated, Literal, Self
 
-from pydantic import BaseModel, ConfigDict, Field, JsonValue, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, JsonValue, StringConstraints, field_validator, model_validator
 
 Identifier = Annotated[str, Field(pattern=r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,95}$")]
+ReportText = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=4000)]
 Version = Annotated[str, Field(pattern=r"^\d+\.\d+\.\d+$")]
 Byte = Annotated[int, Field(ge=0, le=255)]
 I2CAddress = Annotated[int, Field(ge=0x08, le=0x77)]
@@ -26,6 +27,7 @@ ErrorCode = Literal[
     "network_timeout", "dependency_missing", "permission_denied",
     "adapter_not_found", "driver_bound", "transfer_failed", "identity_mismatch",
     "policy_denied", "resource_limit", "remote_state_unknown", "invalid_request",
+    "state_changed", "run_expired", "operation_conflict", "target_busy", "storage_error",
 ]
 
 
@@ -115,6 +117,12 @@ class EvidenceRecord(Contract):
     evidence_id: Identifier
     result: ToolResult
 
+    @field_validator("result")
+    @classmethod
+    def detach_result(cls, result: ToolResult) -> ToolResult:
+        # frozen=True is shallow. Never share caller-owned observation dicts.
+        return ToolResult.model_validate_json(result.model_dump_json(warnings="error"))
+
     @model_validator(mode="after")
     def result_contains_evidence_id(self) -> Self:
         if self.evidence_id not in self.result.evidence_ids:
@@ -138,8 +146,13 @@ class DiagnosticReport(Contract):
     evidence: tuple[EvidenceRecord, ...] = ()
     findings: tuple[Finding, ...] = ()
     hypotheses: tuple[Hypothesis, ...] = ()
-    limitations: Annotated[tuple[str, ...], Field(min_length=1)]
-    next_actions: tuple[str, ...] = ()
+    limitations: Annotated[tuple[ReportText, ...], Field(min_length=1)]
+    next_actions: tuple[ReportText, ...] = ()
+
+    @field_validator("evidence")
+    @classmethod
+    def detach_evidence(cls, records: tuple[EvidenceRecord, ...]) -> tuple[EvidenceRecord, ...]:
+        return tuple(EvidenceRecord.model_validate_json(record.model_dump_json(warnings="error")) for record in records)
 
     @model_validator(mode="after")
     def validate_provenance(self) -> Self:
