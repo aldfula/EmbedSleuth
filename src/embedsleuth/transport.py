@@ -264,6 +264,10 @@ class ParamikoTransport:
             # Paramiko RejectPolicy raises SSHException; no credentials/raw text are returned.
             if not started and "not found in known_hosts" in str(exc):
                 return _failure("host_key_unknown", "SSH host key has not been trusted")
+            # With no key, agent identity or password, Paramiko raises the
+            # generic SSHException rather than AuthenticationException.
+            if not started and str(exc) == "No authentication methods available":
+                return _failure("authentication_failed", "No SSH authentication identity is available")
             return _failure("remote_state_unknown" if started else "network_timeout", "SSH connection failed", unknown=started)
         except OSError:
             return _failure("remote_state_unknown" if started else "network_timeout", "SSH transport unavailable", unknown=started)

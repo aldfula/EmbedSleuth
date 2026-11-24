@@ -1,0 +1,17 @@
+{
+  "schema_version": "1.0",
+  "state_directory": "/home/YOUR_USER/.embedsleuth-state",
+  "targets": [
+    {
+      "target_id": "lab-pi",
+      "host": "192.0.2.10",
+      "username": "pi",
+      "known_hosts_path": "/home/YOUR_USER/.ssh/known_hosts",
+      "key_path": "/home/YOUR_USER/.ssh/embedsleuth_ed25519",
+      "profile_id": "mpu6050",
+      "expected_bus": 1,
+      "expected_addresses": [104],
+      "conflicting_use_excluded": false
+    }
+  ]
+}

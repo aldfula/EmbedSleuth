@@ -138,6 +138,7 @@ def test_equal_but_not_registered_target_never_connects():
 
 @pytest.mark.parametrize("error,code", [
     (paramiko.AuthenticationException("secret"), "authentication_failed"),
+    (paramiko.SSHException("No authentication methods available"), "authentication_failed"),
     (paramiko.SSHException("Server 'pi' not found in known_hosts"), "host_key_unknown"),
     (socket.timeout("secret"), "network_timeout"),
     (FileNotFoundError("private key secret"), "dependency_missing"),
@@ -183,6 +184,17 @@ def test_exec_acknowledgment_failure_is_unknown():
     channel.exec_command = uncertain_exec
     target, client, transport = setup_transport(FakeClient(channel))
     assert transport.execute(target, {"op": "inspect_target"}).remote_state_unknown
+
+
+def test_authentication_text_after_dispatch_cannot_clear_unknown_completion():
+    channel = FakeChannel()
+    def uncertain_exec(command):
+        raise paramiko.SSHException("No authentication methods available")
+    channel.exec_command = uncertain_exec
+    target, client, transport = setup_transport(FakeClient(channel))
+    result = transport.execute(target, {"op": "inspect_target"})
+    assert result.error_code == "remote_state_unknown"
+    assert result.remote_state_unknown
 
 
 def test_host_key_mismatch_is_distinct():

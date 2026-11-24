@@ -1,6 +1,6 @@
 # EmbedSleuth 아키텍처
 
-기준일: 2026-11-18. 기존 AI 호스트·스킬·훅·MCP와 PC/Pi 실행 분리를 확정 아키텍처로 사용한다. Phase별 구현 여부는 [구현 계획](implementation-plan.md)을 따른다.
+기준일: 2026-11-24. 기존 AI 호스트·스킬·훅·MCP와 PC/Pi 실행 분리를 확정 아키텍처로 사용한다. Phase별 구현 여부는 [구현 계획](implementation-plan.md)을 따른다.
 
 ## 1. 배치
 
@@ -76,7 +76,15 @@ Phase 1 계약은 src/embedsleuth/contracts.py와 tools.py에 있다. 모든 모
 | get_report | run_id |
 | cancel_diagnosis | run_id |
 
-Phase 2는 위 도구의 결정적 코어 실행과 대상 등록을 Python API로 구현했다. MCP wire 어댑터는 Phase 3 범위다. address는 wire 계약에서 비예약 7비트 범위를 검증하고, 코어 정책에서 부품과 예상 연결의 교집합으로 다시 제한한다. 레지스터·길이·전송 방식은 프로필로만 정한다.
+Phase 2는 위 도구의 결정적 코어 실행과 대상 등록을 Python API로 구현했고 Phase 3는 같은 입력 스키마와 코어를 STDIO MCP로 노출한다. address는 wire 계약에서 비예약 7비트 범위를 검증하고, 코어 정책에서 부품과 예상 연결의 교집합으로 다시 제한한다. 레지스터·길이·전송 방식은 프로필로만 정한다.
+
+MCP 서버의 `--config`는 신뢰된 로컬 시작 인자다. 소유자 관리 JSON에 절대 상태 경로·대상 목록을 지정하며 64KiB·32개 대상 제한, 미등록 필드·중복 키·ID·동일 SSH 접속 대상 거부를 적용한다. 모델 도구는 설정 경로나 접속 정보를 받지 않는다. 상태 저장소의 기존 권한과 격리를 유지하며 설정이 잘못됐다고 임시 저장소로 대체하지 않는다.
+
+MCP 응답은 `schema_version`, `result`, `error`의 공통 봉투다. `result`에는 원래 코어 결과·프로필·보고서 또는 발견 사항 배열을 넣는다. 실행 오류·차단·미지원·시간 초과와 어댑터 오류는 `isError=true`이며 원래 도구 증거를 보존한다. 정상 비교의 assessment=fail은 실행 오류와 구분한다. 텍스트 content와 structuredContent는 같은 JSON을 제공하며 모든 응답에 공통 outputSchema를 게시한다. 서버 예외·잘못된 인자를 그대로 반사하지 않는다.
+
+동기 코어는 PC의 일반 작업자 최대 4개에서 실행하고, 취소 도구에 별도 작업자 1개를 둔다. 용량 초과는 대기열에 넣지 않고 resource_limit로 거부한다. 대상별 원격 실행 1개 제한은 코어 잠금으로 계속 강제한다. MCP 원격 검사 호출 취소는 영속 취소 표시로 전달한다. EOF·SIGINT·SIGTERM 시 새 요청을 막고 진행 중 원격 검사를 취소한 뒤 모든 작업자의 기록이 끝나야 저장소를 닫는다. SIGKILL 등 정리 불가 종료는 다음 시작의 미완료 의도 복구가 처리한다. 네트워크 기한은 코어가 관리하며 로컬 디스크 정지에 대한 종료 시간 상한은 보장하지 않는다.
+
+Linux의 취소 가능한 입출력 파이프로 대기를 처리하고 공식 SDK가 JSON-RPC·협상·도구 디스패치를 담당한다. SDK 기본 AsyncFile의 스레드 대기는 열린 stdin이나 가득 찬 stdout에서 종료 신호를 지연시켜 대체했다. 실제 fd 0은 /dev/null, fd 1은 stderr로 돌려 검사 코드·자식 프로세스의 일반 입출력을 프로토콜과 분리한다. 출력 연결 단절도 취소와 저장 정리로 처리한다. 입력 한 줄은 512KiB, 검증 전 도구 인자 JSON은 256KiB, 결과 봉투는 1MiB로 제한한다. 큰 결과의 원본 증거는 로컬에 남기며 축약된 성공으로 반환하지 않는다. 이 제한은 SDK가 이미 파싱한 객체의 모든 순간 메모리 사용량을 보장하는 값은 아니다.
 
 구현 상태는 created → connected → probe_ready → identified → reported 순서다. inspected는 계약의 예약 상태이며 현재 코어가 별도 노출하지 않는다. blocked·expired·cancelled는 추가 검사를 막되 보고서 조회·마무리는 허용한다. 상태 전이와 run_id의 진위는 Phase 2 코어가 관리한다. 저장된 JSON을 권위 있는 증거로 사용하고 반환 모델은 복사본이다. 서비스 재시작 후 기존 실행은 보고서·완료 캐시 조회만 허용하며 새 검사는 새 실행을 요구한다. Phase 1의 IdentityReadContext는 안전 판정용 데이터이며 외부 요청에서 받지 않는다.
 
@@ -116,14 +124,14 @@ I2C 자식 명령은 3초 제한과 stdout 1KiB·stderr 4KiB 상한을 적용한
 
 ## 8. 기술 선택
 
-Python 3.11+, Pydantic, pytest를 Phase 1에 사용하고 Phase 2에 Paramiko를 추가했다. 소유자 전용 파일 저장소와 Linux flock으로 DB 없이 내구성과 동시 실행 제한을 구현한다. Phase 3에 공식 MCP Python SDK를 추가한다. Typer·Rich는 필요할 때 보조 관리 CLI에만 사용한다. Pi는 PC 의존성을 설치하지 않는다. DB·벡터 DB·자체 LLM 루프·복잡한 프레임워크는 도입하지 않는다.
+Python 3.11+, Pydantic, pytest를 Phase 1에 사용하고 Phase 2에 Paramiko를 추가했다. 소유자 전용 파일 저장소와 Linux flock으로 DB 없이 내구성과 동시 실행 제한을 구현한다. Phase 3는 공식 MCP Python SDK 2.x의 저수준 Server와 AnyIO를 사용한다. 검증 버전은 2.3.0이며 입력 스키마를 기존 코어와 공유한다. SDK의 HTTP 관련 전이 의존성도 PC에 설치되지만 실행 경로는 STDIO뿐이며 수신 포트를 열지 않는다. 실행 옵션 두 개 수준은 argparse로 충분하므로 Typer·Rich는 추가하지 않았다. Pi는 PC 의존성을 설치하지 않는다. DB·벡터 DB·자체 LLM 루프·복잡한 프레임워크는 도입하지 않는다. [공식 SDK](https://github.com/modelcontextprotocol/python-sdk), [저수준 서버 API](https://py.sdk.modelcontextprotocol.io/advanced/low-level-server/)
 
 ## 9. 지원 검증 현황
 
 | 환경 | 상태 |
 |---|---|
-| Linux x86_64 / Python 3.12 | Phase 1–2 자동 시험 환경 |
+| Linux x86_64 / Python 3.12 | Phase 1–3 자동 시험 환경; SDK 클라이언트와 실제 STDIO 자식 프로세스 검증 |
 | Python 3.11 | 최소 개발 대상, 아직 해당 버전 시험하지 않음 |
-| Codex CLI 스킬·훅·STDIO MCP | 통합 시험 예정 |
-| Raspberry Pi 3 / OS·커널·32/64비트 | 대상 정보 수집·실물 시험 예정 |
+| Codex CLI 스킬·훅·STDIO MCP | 실제 AI 호스트 등록·스킬·훅 통합 시험 예정 |
+| Pi 3 Model B Rev 1.2 / Raspbian 13 / armv7l | 실제 SSH·보드·I2C 환경·주소 0x68 식별 읽기 통과(2026-11-24); 자원·오류·종료와 0x69 인수는 남음 |
 | Windows·macOS·다른 AI 호스트 | 별도 지원 시험 전 |
