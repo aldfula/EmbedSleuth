@@ -1,4 +1,4 @@
-# Verified on Linux x86_64 / Python 3.12.14, 2026-11-24.
+# Verified on Linux x86_64 / Python 3.12.14, 2026-11-25.
 # Runtime + test dependencies; build isolation resolves setuptools separately.
 annotated-types==0.8.0
 iniconfig==2.3.1
@@ -37,3 +37,4 @@ sse-starlette==3.7.1
 starlette==1.10.0
 truststore==0.10.5
 uvicorn==0.54.0
+PyYAML==6.0.4

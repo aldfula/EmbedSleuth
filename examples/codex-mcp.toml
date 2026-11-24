@@ -1,0 +1,7 @@
+# Copy only this table into the trusted host configuration after replacing paths.
+# This example does not change tool approval policy or register SSH targets.
+[mcp_servers.embedsleuth]
+command = "/ABSOLUTE/PATH/EmbedSleuth/.venv/bin/python"
+args = ["-I", "-m", "embedsleuth.mcp_server", "--config", "/ABSOLUTE/PATH/targets.json"]
+startup_timeout_sec = 20
+tool_timeout_sec = 20

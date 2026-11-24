@@ -1,0 +1,14 @@
+interface:
+  display_name: "EmbedSleuth MPU6050 진단"
+  short_description: "Raspberry Pi 3의 MPU6050 연결과 인식을 MCP로 진단"
+  default_prompt: "$diagnose-mpu6050로 등록된 lab-pi의 MPU6050 인식 문제를 진단해 줘."
+
+dependencies:
+  tools:
+    - type: "mcp"
+      value: "embedsleuth"
+      description: "로컬에 등록된 EmbedSleuth STDIO 진단 서버"
+      transport: "stdio"
+
+policy:
+  allow_implicit_invocation: true

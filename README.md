@@ -17,7 +17,7 @@ Pi에 LLM·MCP 서버·상주 에이전트를 설치하지 않습니다. EmbedSl
 
 ## 현재 구현 상태
 
-**Phase 3의 로컬 STDIO MCP 서버까지 구현했습니다.**
+**Phase 4의 진단 스킬과 Codex 검색 연결까지 구현했습니다.**
 
 - 엄격한 도구·결과·증거 계약, 검토된 MPU6050 프로필과 읽기 정책
 - 로컬 등록 대상만 사용하는 Paramiko SSH 전송과 호스트 키 검증
@@ -26,8 +26,9 @@ Pi에 LLM·MCP 서버·상주 에이전트를 설치하지 않습니다. EmbedSl
 - 소유자 전용 증거 저장, 원자적 보고서 갱신, 중단 복구와 대상 격리
 - 가짜 SSH·로컬 자식 프로세스·저장 실패를 이용한 오프라인 테스트
 - 아홉 진단 도구의 MCP 스키마·구조화 응답, 로컬 대상 설정, 취소·종료 처리
+- diagnose-mpu6050 스킬, 실패 분기·근거 보고 지침, 20개 MCP 절차 재생 시험
 
-**진단 스킬과 훅은 Phase 4–5에서 연결합니다.** 별도의 대화형 CLI를 열 필요는 없습니다. 기존 AI 호스트에 서버 실행 명령을 등록하면 호스트가 MCP 프로세스를 시작하고 도구를 호출합니다. 아래 자연어 요청에 따른 스킬 자동 선택과 전체 에이전트 동작은 후속 통합 검증 대상입니다.
+**훅은 Phase 5에서 연결합니다.** 별도의 대화형 CLI를 열 필요는 없습니다. 기존 AI 호스트에 서버 실행 명령을 등록하면 호스트가 MCP 프로세스를 시작하고 도구를 호출합니다. Codex CLI의 스킬·MCP 검색은 임시 설정으로 확인했으며, 모델의 자연어 선택·보고 품질과 실제 Pi까지의 통합은 후속 평가 대상입니다.
 
 > EmbedSleuth로 등록된 lab-pi의 MPU6050 인식 문제를 진단해 줘.
 
@@ -41,7 +42,7 @@ python3 -m venv .venv
 PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv/bin/python -I -m pytest -q -W error
 ```
 
-Python의 -I 옵션으로 외부 PYTHONPATH를 무시하고 pytest 자동 플러그인 로드를 끄므로 PC의 ROS 등 외부 패키지가 테스트 환경에 개입하지 않습니다. 테스트는 외부 네트워크·Pi·LLM·API 키를 요구하지 않습니다. asyncio의 로컬 소켓·스레드 알림과 자식 프로세스 실행은 허용되어야 합니다. 최신 테스트 수와 패키지 검증 결과는 [구현 계획](docs/implementation-plan.md#phase-3-검증)에 기록합니다.
+Python의 -I 옵션으로 외부 PYTHONPATH를 무시하고 pytest 자동 플러그인 로드를 끄므로 PC의 ROS 등 외부 패키지가 테스트 환경에 개입하지 않습니다. 테스트는 외부 네트워크·Pi·LLM·API 키를 요구하지 않습니다. asyncio의 로컬 소켓·스레드 알림과 자식 프로세스 실행은 허용되어야 합니다. 최신 테스트 수와 검증 결과는 [구현 계획](docs/implementation-plan.md#phase-4-검증)에 기록합니다.
 
 개발 환경의 정확한 의존성 재현에는 다음을 사용할 수 있습니다. 현재 제약 파일은 Linux·Python 3.12 검증 환경의 버전입니다.
 
@@ -60,6 +61,16 @@ Python의 -I 옵션으로 외부 PYTHONPATH를 무시하고 pytest 자동 플러
 ```
 
 설치 시 제공되는 `embedsleuth-mcp --config /ABSOLUTE/PATH/targets.json` 진입점도 같은 서버를 실행합니다. 이 프로세스는 STDIO 프로토콜을 기다리는 서버입니다. [설정·도구 호출·응답·취소 안내](docs/mcp-usage.md)를 참고하세요. 실제 AI 호스트의 설정은 이번 단계에서 변경하지 않았습니다.
+
+## 스킬 사용
+
+원본 스킬은 [skills/diagnose-mpu6050](skills/diagnose-mpu6050/SKILL.md)에 있으며 `.agents/skills`의 상대 링크로 이 저장소의 Codex에서 검색됩니다. 운영 MCP 설정을 준비한 뒤 명시적으로 요청할 수 있습니다.
+
+```text
+$diagnose-mpu6050로 등록된 lab-pi의 환경만 passive로 조사해 줘. 센서 통신은 하지 마.
+```
+
+[스킬 사용·호스트 설정 안내](docs/skill-usage.md)와 [Codex 설정 예](examples/codex-mcp.toml)를 참고하세요. 실제 등록된 target_id를 사용해야 합니다. Python wheel은 MCP 서버 배포물이며 스킬은 현재 저장소의 별도 자료입니다.
 
 ## 진단 실행 경계
 
@@ -87,4 +98,6 @@ Python의 -I 옵션으로 외부 PYTHONPATH를 무시하고 pytest 자동 플러
 - [Phase 2 교차 검토와 수정](docs/phase2-review.md)
 - [Phase 2 코어 사용 예](docs/phase2-usage.md)
 - [Phase 3 MCP 사용과 운영 조건](docs/mcp-usage.md)
+- [Phase 4 스킬 사용·Codex 검색 검증](docs/skill-usage.md)
+- [스킬 평가 자료와 모델 행동 평가 경계](evals/diagnose-mpu6050/README.md)
 - [이전 설계 논의 기록](docs/design.md) — 현재 규격은 위 세 문서를 따릅니다.

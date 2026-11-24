@@ -14,7 +14,7 @@ dependencies = ["pydantic>=2.10,<3", "paramiko>=3.4,<5", "mcp>=2.3,<3", "anyio>=
 embedsleuth-mcp = "embedsleuth.mcp_server:main"
 
 [project.optional-dependencies]
-dev = ["pytest>=8,<10"]
+dev = ["pytest>=8,<10", "PyYAML>=6,<7"]
 
 [tool.setuptools.packages.find]
 where = ["src"]

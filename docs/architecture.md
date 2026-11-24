@@ -1,6 +1,6 @@
 # EmbedSleuth 아키텍처
 
-기준일: 2026-11-24. 기존 AI 호스트·스킬·훅·MCP와 PC/Pi 실행 분리를 확정 아키텍처로 사용한다. Phase별 구현 여부는 [구현 계획](implementation-plan.md)을 따른다.
+기준일: 2026-11-25. 기존 AI 호스트·스킬·훅·MCP와 PC/Pi 실행 분리를 확정 아키텍처로 사용한다. Phase별 구현 여부는 [구현 계획](implementation-plan.md)을 따른다.
 
 ## 1. 배치
 
@@ -50,7 +50,11 @@ Pi는 기존 SSH 서버·I2C 드라이버·기존 검사 명령과 최소 Python
 
 ## 3. 스킬과 훅
 
-첫 스킬 diagnose-mpu6050는 대상 확인 → 환경 조사 → I2C 조사 → 조건부 식별 읽기 → 규칙 평가 → 근거 있는 보고서 순서를 정의한다. 명시 호출부터 검증하며 이후 자연어 자동 선택을 평가한다. 스킬의 MCP 의존성 선언을 사용한다. [공식 OpenAI 스킬 문서](https://learn.chatgpt.com/docs/build-skills)
+Phase 4의 diagnose-mpu6050는 대상 확인 → 환경 조사 → I2C 조사 → 조건부 식별 읽기 → 규칙 평가 → 근거 있는 보고서 순서를 정의한다. 원본은 skills/diagnose-mpu6050이며 .agents/skills의 저장소 내부 상대 링크로 검색한다. agents/openai.yaml에 embedsleuth STDIO MCP 의존성과 자동 선택 허용을 선언한다. 명시 호출부터 평가하는 순서와 자동 선택 허용 정책은 별개다. [공식 OpenAI 스킬 문서](https://learn.chatgpt.com/docs/build-skills)
+
+스킬은 누락 대상·주소·현재 충돌 배제 확인, passive 범위, 실제 도구 스키마·응답 봉투, 오류·취소 시 중단, 출처 참조와 보고 한계를 안내한다. 범용 셸로 검사를 대체하거나 모델이 관측·승인을 생성하지 않는다. 로컬 등록의 운영 선언은 질문 답변만으로 바뀌지 않는다. 코어 코드를 호출하는 별도 LLM 루프·진단용 스크립트는 스킬에 포함하지 않는다.
+
+평가 자료의 검토된 20개 절차를 실제 MCP·코어와 가짜 전송으로 재생한다. 별도의 개발용 Codex 확인기는 임시 설정·빈 대상 목록에서 skills/list와 mcpServerStatus/list를 읽어 검색·의존성·아홉 입력 스키마를 확인한다. 모델 turn·운영 대상 설정을 생성하지 않는다. 자연어 선택·절차 준수·원인 설명 품질은 이 시험으로 입증되지 않으며 Phase 6 모델 행동 평가에 남긴다. [스킬 운영 안내](skill-usage.md), [평가 자료](../evals/diagnose-mpu6050/README.md)
 
 | 훅 | 수행할 일 | 수행하지 않을 일 |
 |---|---|---|
@@ -132,6 +136,7 @@ Python 3.11+, Pydantic, pytest를 Phase 1에 사용하고 Phase 2에 Paramiko를
 |---|---|
 | Linux x86_64 / Python 3.12 | Phase 1–3 자동 시험 환경; SDK 클라이언트와 실제 STDIO 자식 프로세스 검증 |
 | Python 3.11 | 최소 개발 대상, 아직 해당 버전 시험하지 않음 |
-| Codex CLI 스킬·훅·STDIO MCP | 실제 AI 호스트 등록·스킬·훅 통합 시험 예정 |
+| Codex CLI 0.172.0 | 저장소 스킬·STDIO 의존성·아홉 스키마 검색 확인; 임시 설정·빈 대상·모델 turn 없음 |
+| 모델의 스킬 명시·자동 선택·보고 품질·훅 | 실제 모델 행동과 훅 통합 시험 예정 |
 | Pi 3 Model B Rev 1.2 / Raspbian 13 / armv7l | 실제 SSH·보드·I2C 환경·주소 0x68 식별 읽기 통과(2026-11-24); 자원·오류·종료와 0x69 인수는 남음 |
 | Windows·macOS·다른 AI 호스트 | 별도 지원 시험 전 |
