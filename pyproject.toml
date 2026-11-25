@@ -12,6 +12,7 @@ dependencies = ["pydantic>=2.10,<3", "paramiko>=3.4,<5", "mcp>=2.3,<3", "anyio>=
 
 [project.scripts]
 embedsleuth-mcp = "embedsleuth.mcp_server:main"
+embedsleuth-hook = "embedsleuth.hooks:main"
 
 [project.optional-dependencies]
 dev = ["pytest>=8,<10", "PyYAML>=6,<7"]

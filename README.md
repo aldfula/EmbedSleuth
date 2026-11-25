@@ -17,7 +17,7 @@ Pi에 LLM·MCP 서버·상주 에이전트를 설치하지 않습니다. EmbedSl
 
 ## 현재 구현 상태
 
-**Phase 4의 진단 스킬과 Codex 검색 연결까지 구현했습니다.**
+**Phase 5의 호출 전후·종료 훅까지 구현했습니다.**
 
 - 엄격한 도구·결과·증거 계약, 검토된 MPU6050 프로필과 읽기 정책
 - 로컬 등록 대상만 사용하는 Paramiko SSH 전송과 호스트 키 검증
@@ -27,8 +27,9 @@ Pi에 LLM·MCP 서버·상주 에이전트를 설치하지 않습니다. EmbedSl
 - 가짜 SSH·로컬 자식 프로세스·저장 실패를 이용한 오프라인 테스트
 - 아홉 진단 도구의 MCP 스키마·구조화 응답, 로컬 대상 설정, 취소·종료 처리
 - diagnose-mpu6050 스킬, 실패 분기·근거 보고 지침, 20개 MCP 절차 재생 시험
+- 인자·저장 증거·보고서 훅, 진단 저장소의 읽기 전용 조회, 종료 보완 1회 제한
 
-**훅은 Phase 5에서 연결합니다.** 별도의 대화형 CLI를 열 필요는 없습니다. 기존 AI 호스트에 서버 실행 명령을 등록하면 호스트가 MCP 프로세스를 시작하고 도구를 호출합니다. Codex CLI의 스킬·MCP 검색은 임시 설정으로 확인했으며, 모델의 자연어 선택·보고 품질과 실제 Pi까지의 통합은 후속 평가 대상입니다.
+별도의 대화형 CLI를 열 필요는 없습니다. 기존 AI 호스트에 서버 실행 명령을 등록하면 호스트가 MCP 프로세스를 시작하고 도구를 호출합니다. Codex CLI의 스킬·MCP·훅 검색은 임시 설정으로 확인했습니다. 운영 훅 활성화에는 호스트의 사용자 검토·신뢰가 필요하며, 모델의 자연어 선택·보고 품질과 실제 Pi까지의 전체 통합은 Phase 6 평가 대상입니다.
 
 > EmbedSleuth로 등록된 lab-pi의 MPU6050 인식 문제를 진단해 줘.
 
@@ -42,7 +43,7 @@ python3 -m venv .venv
 PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv/bin/python -I -m pytest -q -W error
 ```
 
-Python의 -I 옵션으로 외부 PYTHONPATH를 무시하고 pytest 자동 플러그인 로드를 끄므로 PC의 ROS 등 외부 패키지가 테스트 환경에 개입하지 않습니다. 테스트는 외부 네트워크·Pi·LLM·API 키를 요구하지 않습니다. asyncio의 로컬 소켓·스레드 알림과 자식 프로세스 실행은 허용되어야 합니다. 최신 테스트 수와 검증 결과는 [구현 계획](docs/implementation-plan.md#phase-4-검증)에 기록합니다.
+Python의 -I 옵션으로 외부 PYTHONPATH를 무시하고 pytest 자동 플러그인 로드를 끄므로 PC의 ROS 등 외부 패키지가 테스트 환경에 개입하지 않습니다. 테스트는 외부 네트워크·Pi·LLM·API 키를 요구하지 않습니다. asyncio의 로컬 소켓·스레드 알림과 자식 프로세스 실행은 허용되어야 합니다. 최신 테스트 수와 검증 결과는 [구현 계획](docs/implementation-plan.md#phase-5-검증)에 기록합니다.
 
 개발 환경의 정확한 의존성 재현에는 다음을 사용할 수 있습니다. 현재 제약 파일은 Linux·Python 3.12 검증 환경의 버전입니다.
 
@@ -72,6 +73,10 @@ $diagnose-mpu6050로 등록된 lab-pi의 환경만 passive로 조사해 줘. 센
 
 [스킬 사용·호스트 설정 안내](docs/skill-usage.md)와 [Codex 설정 예](examples/codex-mcp.toml)를 참고하세요. 실제 등록된 target_id를 사용해야 합니다. Python wheel은 MCP 서버 배포물이며 스킬은 현재 저장소의 별도 자료입니다.
 
+## 훅 사용
+
+[훅 설정·사용 안내](docs/hooks-usage.md)에 따라 [설정 예](examples/codex-hooks.json)의 절대 경로를 교체하고 Codex에서 검토·신뢰합니다. 훅은 PC에서 인자·증거·종료 보고서를 확인하며 장치 검사나 승인 생성을 수행하지 않습니다. 훅 실패 시에도 코어의 읽기 정책은 유지됩니다. 현재 운영 호스트의 훅 설정·신뢰는 자동 변경하지 않았습니다.
+
 ## 진단 실행 경계
 
 신뢰된 로컬 코드가 `RegisteredTarget`에 호스트·계정·신뢰 파일·예상 버스와 주소를 등록한 뒤 `TargetRegistry`, `RunStore`, `ParamikoTransport`, `DiagnosticCore`를 조합합니다. AI가 받는 것은 `target_id`와 `run_id`이며 SSH 접속 정보는 도구 인자로 받지 않습니다. [코어 사용 예와 운영 조건](docs/phase2-usage.md)을 참고하세요.
@@ -99,5 +104,6 @@ $diagnose-mpu6050로 등록된 lab-pi의 환경만 passive로 조사해 줘. 센
 - [Phase 2 코어 사용 예](docs/phase2-usage.md)
 - [Phase 3 MCP 사용과 운영 조건](docs/mcp-usage.md)
 - [Phase 4 스킬 사용·Codex 검색 검증](docs/skill-usage.md)
+- [Phase 5 훅 설정·신뢰·검증 경계](docs/hooks-usage.md)
 - [스킬 평가 자료와 모델 행동 평가 경계](evals/diagnose-mpu6050/README.md)
 - [이전 설계 논의 기록](docs/design.md) — 현재 규격은 위 세 문서를 따릅니다.

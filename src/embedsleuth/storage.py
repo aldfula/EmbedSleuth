@@ -136,6 +136,7 @@ class RunStore:
         if ".." in path.parts or path == Path("/"):
             raise StorageError("invalid storage root")
         self.root = path
+        self._read_only = False
         self._local = threading.local()
         self._root_fd = -1
         parent_fd = self._open_absolute_directory(path.parent)
@@ -166,6 +167,29 @@ class RunStore:
         except BaseException:
             self.close()
             raise
+
+    @classmethod
+    def open_reader(cls, root: str | os.PathLike[str]) -> RunStore:
+        """Open existing storage without creating, locking or recovering runs.
+
+        Snapshots can race a live writer. Readers must detect inconsistent
+        generations and report uncertainty rather than repairing the store.
+        """
+        path = Path(root)
+        if not path.is_absolute() or ".." in path.parts or path == Path("/"):
+            raise StorageError("invalid storage root")
+        reader = cls.__new__(cls)
+        reader.root = path
+        reader._local = threading.local()
+        reader._read_only = True
+        reader._root_fd = -1
+        try:
+            reader._root_fd = cls._open_absolute_directory(path)
+            _check_owner(os.fstat(reader._root_fd), directory=True)
+        except BaseException:
+            reader.close()
+            raise
+        return reader
 
     @staticmethod
     def _open_absolute_directory(path: Path) -> int:
@@ -234,6 +258,8 @@ class RunStore:
 
     @contextmanager
     def _lock(self, kind: str, identifier: str) -> Iterator[None]:
+        if self._read_only:
+            raise StorageError("read-only store")
         _identifier(identifier)
         name = f"{kind}-{identifier}.lock"
         held = getattr(self._local, "held", None)

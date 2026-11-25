@@ -42,11 +42,15 @@ def request(process, request_id, method, params):
 
 @contextmanager
 def app_server(codex, project, temporary):
+    from embedsleuth.hooks import codex_hook_definitions
+
     probe_home = temporary / "codex-home"
     probe_home.mkdir()
     targets = temporary / "targets.json"
     targets.write_text(json.dumps({"schema_version": "1.0", "state_directory": str(temporary / "state"), "targets": []}))
     targets.chmod(0o600)
+    (probe_home / "hooks.json").write_text(json.dumps(codex_hook_definitions(
+        Path(sys.executable), targets, temporary / "hook-state")))
     # JSON strings are a subset of TOML basic strings for these local paths.
     quote = lambda value: json.dumps(str(value))
     (probe_home / "config.toml").write_text(
@@ -89,7 +93,7 @@ def check(codex, project):
         temporary = Path(directory)
         with app_server(codex, project, temporary) as process:
             request(process, 1, "initialize", {
-                "clientInfo": {"name": "embedsleuth-phase4-check", "version": "0.1.0"},
+                "clientInfo": {"name": "embedsleuth-host-check", "version": "0.1.0"},
                 "capabilities": {"experimentalApi": True},
             })
             process.stdin.write(b'{"method":"initialized"}\n')
@@ -116,8 +120,21 @@ def check(codex, project):
                 raise ProbeError("Codex did not receive the nine exact diagnostic tool schemas")
             if list((temporary / "state/runs").iterdir()):
                 raise ProbeError("Host discovery unexpectedly created a diagnostic run")
+            listing = request(process, 4, "hooks/list", {"cwds": [str(project)]})
+            entries = [entry for entry in listing["data"] if Path(entry["cwd"]) == project]
+            if len(entries) != 1 or entries[0]["errors"]:
+                raise ProbeError("Codex reported hook loading errors")
+            hooks = [item for item in entries[0]["hooks"]
+                     if Path(item["sourcePath"]) == temporary / "codex-home/hooks.json"]
+            if (len(hooks) != 3 or {item["eventName"] for item in hooks} != {"preToolUse", "postToolUse", "stop"}
+                    or any(item["handlerType"] != "command" or item["trustStatus"] != "untrusted"
+                           or item["isManaged"] or item["timeoutSec"] != 5 for item in hooks)):
+                raise ProbeError("Expected three untrusted command hooks; review host version/trust")
+            if (temporary / "hook-state").exists():
+                raise ProbeError("Host discovery unexpectedly executed diagnostic hooks")
     return {"skill": "diagnose-mpu6050", "scope": "repo", "mcp_server": "embedsleuth",
-            "tool_count": len(advertised), "model_turns": 0, "registered_targets": 0}
+            "tool_count": len(advertised), "hook_count": len(hooks), "hook_trust": "untrusted",
+            "model_turns": 0, "registered_targets": 0}
 
 
 def main():

@@ -1,0 +1,39 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "^mcp__embedsleuth__.*$",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/ABSOLUTE/PATH/EmbedSleuth/.venv/bin/python -I -m embedsleuth.hooks --event PreToolUse --config /ABSOLUTE/PATH/targets.json --hook-state /ABSOLUTE/PATH/embedsleuth-hooks",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "^mcp__embedsleuth__.*$",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/ABSOLUTE/PATH/EmbedSleuth/.venv/bin/python -I -m embedsleuth.hooks --event PostToolUse --config /ABSOLUTE/PATH/targets.json --hook-state /ABSOLUTE/PATH/embedsleuth-hooks",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/ABSOLUTE/PATH/EmbedSleuth/.venv/bin/python -I -m embedsleuth.hooks --event Stop --config /ABSOLUTE/PATH/targets.json --hook-state /ABSOLUTE/PATH/embedsleuth-hooks",
+            "timeout": 5
+          }
+        ]
+      }
+    ]
+  }
+}
