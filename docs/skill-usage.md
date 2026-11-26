@@ -4,7 +4,7 @@
 
 ## 저장소에서 발견
 
-스킬의 원본은 `skills/diagnose-mpu6050/`이다. `.agents/skills/diagnose-mpu6050`의 저장소 내부 상대 링크로 Codex의 저장소 스킬 검색에 연결한다. 저장소를 복제한 뒤 그 안에서 Codex를 사용한다. 다른 프로젝트의 전역 스킬은 변경하지 않는다. Python wheel은 MCP 서버 배포물이며, 스킬은 현재 저장소의 별도 자료다.
+스킬의 배포 원본은 `src/embedsleuth/data/skills/diagnose-mpu6050/`이고 `skills/diagnose-mpu6050/`은 같은 내용의 저장소 별칭이다. `.agents/skills/diagnose-mpu6050`의 저장소 내부 상대 링크로 Codex의 저장소 스킬 검색에 연결한다. 저장소를 복제한 뒤 그 안에서 Codex를 사용한다. 다른 프로젝트의 전역 스킬은 변경하지 않는다. Python wheel에도 같은 스킬·참조·호스트 메타데이터가 포함된다. 저장소 없이 설치한 사용자는 [설치 준비 명령](installation.md)으로 새 작업 폴더의 .agents/skills에 복사한다. 기존 Codex 설정이나 신뢰는 덮어쓰지 않는다.
 
 Codex는 `.agents/skills`와 링크된 스킬을 검색하고 `$diagnose-mpu6050` 명시 호출과 description 기반 자동 선택을 지원한다. 업데이트가 보이지 않으면 호스트를 새로고침하거나 재시작한다. [공식 스킬 문서](https://learn.chatgpt.com/docs/build-skills)
 

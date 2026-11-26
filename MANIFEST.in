@@ -1,0 +1,5 @@
+prune tests
+prune .embedsleuth-local
+prune .codex
+prune .aws
+global-exclude __pycache__ *.py[cod]

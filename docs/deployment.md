@@ -2,7 +2,9 @@
 
 MVP 배포 대상은 Linux 개발 PC다. Python 패키지·MCP 서버·스킬·훅·AI 호스트는 PC에서 실행한다. Pi에는 기존 Python 3와 I2C 도구를 사용하며 이 문서의 PC 설치 명령을 Pi에서 실행하지 않는다. 검증 환경과 남은 인수는 [Phase 6 기록](phase6-acceptance.md)을 따른다.
 
-## PC 준비
+일반 사용자는 [새 PC 설치 안내](installation.md)의 GitHub Release wheel과 설치 준비 명령을 사용한다. 아래는 개발 저장소를 수정·검증하는 절차다.
+
+## 개발 PC 준비
 
 ```bash
 python3 -m venv .venv
@@ -10,7 +12,7 @@ python3 -m venv .venv
 PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv/bin/python -I -m pytest -q -W error
 ```
 
-제품에는 자체 LLM 로그인·API 클라이언트가 없다. 사용 중인 Codex 등 AI 호스트의 모델과 인증을 사용한다. 스킬은 저장소의 .agents/skills 상대 링크로 검색한다. 다른 PC에 wheel만 설치하면 저장소 스킬·예제가 함께 등록되지는 않는다. [스킬 사용 안내](skill-usage.md)
+제품에는 자체 LLM 로그인·API 클라이언트가 없다. 사용 중인 Codex 등 AI 호스트의 모델과 인증을 사용한다. wheel에는 스킬·참조·프로필·등록 예제가 포함된다. 설치 준비 명령은 새 작업 폴더에 연결 자료를 복사하며, 기존 등록을 재사용하거나 명시된 새 빈 등록을 만든다. 사용자 전역 설정·훅 신뢰·SSH는 자동 변경하지 않는다. 개발 저장소의 .agents/skills 상대 링크도 유지한다. [스킬 사용 안내](skill-usage.md)
 
 ## SSH와 대상 등록
 

@@ -152,7 +152,7 @@ def check(codex, project):
             if len(matches) != 1 or not matches[0]["enabled"] or matches[0]["scope"] != "repo":
                 raise ProbeError("Expected exactly one enabled repository diagnostic skill")
             skill = matches[0]
-            if Path(skill["path"]).resolve() != project / "skills/diagnose-mpu6050/SKILL.md":
+            if Path(skill["path"]).resolve() != (project / "skills/diagnose-mpu6050/SKILL.md").resolve():
                 raise ProbeError("Codex loaded a different diagnostic skill")
             dependencies = (skill.get("dependencies") or {}).get("tools", [])
             if not any(item["type"] == "mcp" and item["value"] == "embedsleuth" for item in dependencies):

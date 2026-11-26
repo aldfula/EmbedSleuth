@@ -54,7 +54,7 @@ def test_skill_references_are_local_discoverable_and_do_not_escape_package():
                 continue
             visit(path.parent / destination.split("#")[0])
     visit(SKILL / "SKILL.md")
-    assert set(SKILL.rglob("*.md")) == visited
+    assert {path.resolve() for path in SKILL.rglob("*.md")} == visited
 
 
 def test_documented_tool_examples_validate_against_live_strict_input_schemas():

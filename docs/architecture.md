@@ -50,7 +50,7 @@ Pi는 기존 SSH 서버·I2C 드라이버·기존 검사 명령과 최소 Python
 
 ## 3. 스킬과 훅
 
-Phase 4의 diagnose-mpu6050는 대상 확인 → 환경 조사 → I2C 조사 → 조건부 식별 읽기 → 규칙 평가 → 근거 있는 보고서 순서를 정의한다. 원본은 skills/diagnose-mpu6050이며 .agents/skills의 저장소 내부 상대 링크로 검색한다. agents/openai.yaml에 embedsleuth STDIO MCP 의존성과 자동 선택 허용을 선언한다. 명시 호출부터 평가하는 순서와 자동 선택 허용 정책은 별개다. [공식 OpenAI 스킬 문서](https://learn.chatgpt.com/docs/build-skills)
+Phase 4의 diagnose-mpu6050는 대상 확인 → 환경 조사 → I2C 조사 → 조건부 식별 읽기 → 규칙 평가 → 근거 있는 보고서 순서를 정의한다. 배포 원본은 src/embedsleuth/data/skills/diagnose-mpu6050이며 skills/diagnose-mpu6050 별칭과 .agents/skills의 저장소 내부 상대 링크로 검색한다. agents/openai.yaml에 embedsleuth STDIO MCP 의존성과 자동 선택 허용을 선언한다. 명시 호출부터 평가하는 순서와 자동 선택 허용 정책은 별개다. [공식 OpenAI 스킬 문서](https://learn.chatgpt.com/docs/build-skills)
 
 스킬은 누락 대상·주소·현재 충돌 배제 확인, passive 범위, 실제 도구 스키마·응답 봉투, 오류·취소 시 중단, 출처 참조와 보고 한계를 안내한다. 범용 셸로 검사를 대체하거나 모델이 관측·승인을 생성하지 않는다. 로컬 등록의 운영 선언은 질문 답변만으로 바뀌지 않는다. 코어 코드를 호출하는 별도 LLM 루프·진단용 스크립트는 스킬에 포함하지 않는다.
 
@@ -153,3 +153,8 @@ Python 3.11+, Pydantic, pytest를 Phase 1에 사용하고 Phase 2에 Paramiko를
 
 
 2026-11-26 로컬 운영자 복구는 원래 interrupted/unknown 실행을 그대로 두고 별도 passive-reboot-resolution.json에 부트·호스트 지문·등록·감사/evidence digest를 결합한다. 기록 영속화 후에만 대상 격리를 제거한다. 센서 읽기·pending 작업·다른 불명확 실행·등록 변경·저장 실패는 거부한다. MCP 아홉 도구와 읽기 정책에는 승인·격리 해제 인자를 추가하지 않는다. 이전 코드를 로드한 서버는 재연결해 새 복구 기록 검증을 사용해야 한다. [구체적 범위](passive-recovery-plan.md)
+
+
+## v0.1.0 배포 구성
+
+wheel과 sdist에 MCP·훅·스킬·참조·프로필·대상 예제를 함께 포함한다. `embedsleuth-setup`은 새 작업 폴더의 연결 자료만 준비하며 기존 프로젝트나 운영 등록을 덮어쓰지 않는다. 새 등록은 --init-config와 새 증거 경로를 명시해야 하고 대상 0개로 시작한다. 기존 설치는 같은 등록·증거·격리를 그대로 재사용한다. 훅 신뢰·승인 정책·SSH 신뢰·장치 설정을 부여하거나 변경하지 않는다. 설치 자체가 모델·장치 접근을 실행하지 않는다. [설치 절차](installation.md)
