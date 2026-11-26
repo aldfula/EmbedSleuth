@@ -8,8 +8,9 @@ event after receiving a terminal result. Unfinished operations are never replaye
 
 from __future__ import annotations
 
-from contextlib import contextmanager
+from contextlib import ExitStack, contextmanager
 import fcntl
+import hashlib
 import json
 import math
 import os
@@ -19,6 +20,7 @@ import stat
 import threading
 from typing import Any, Iterator
 from uuid import uuid4
+from uuid import UUID
 
 
 class StorageError(ValueError):
@@ -441,6 +443,129 @@ class RunStore:
                 raise StorageError("invalid quarantine record")
             return True
 
+    @staticmethod
+    def _snapshot_digest(value: Any) -> str:
+        return hashlib.sha256(json.dumps(value, sort_keys=True, separators=(",", ":"),
+                                         allow_nan=False).encode()).hexdigest()
+
+    def _resolution_audit_matches(self, digest: str, events: list[dict]) -> bool:
+        # An older reader may append bookkeeping after the acknowledged closed
+        # cancellation. Accept only the exact no-IO recovery suffix; original
+        # remote events and every other journal change stay digest-bound.
+        tail = len(events)
+        for _ in range(65):
+            if digest == self._snapshot_digest(events[:tail]):
+                return True
+            if tail == 0 or events[tail - 1] != {
+                "action": "recovery", "operation_ids": [], "error_code": "remote_state_unknown",
+            }:
+                return False
+            tail -= 1
+        return False
+
+    def _passive_cancel_candidate(self, run_id: str, state: dict, events: list[dict]) -> bool:
+        before = [e for e in events if e.get("action") == "before"]
+        after = [e for e in events if e.get("action") == "after"]
+        if len(before) != 1 or len(after) != 1:
+            return False
+        evidence = state.get("evidence", [])
+        return (state.get("mode") == "passive" and state.get("state") in ("cancelled", "blocked")
+                and state.get("remote_state") == "unknown"
+                and type(state.get("remote_calls")) is int and state["remote_calls"] == 1
+                and state.get("pending_operation") is None and not state.get("operations")
+                and self.cancel_requested(run_id)
+                and before[0].get("tool") == "inspect_target"
+                and before[0].get("request") == {"op": "inspect_target"}
+                and isinstance(before[0].get("operation_id"), str)
+                and before[0]["operation_id"] == after[0].get("operation_id")
+                and after[0].get("remote_state_unknown") is True
+                and len(evidence) == 1 and isinstance(evidence[0], dict)
+                and evidence[0].get("result", {}).get("request_id") == before[0]["operation_id"]
+                and evidence[0].get("result", {}).get("error", {}).get("code") == "remote_state_unknown")
+
+    def _passive_reboot_resolved(self, run_id: str, state: dict, events: list[dict]) -> bool:
+        with self._run(run_id) as run_fd:
+            try:
+                record = self._decode(self._read_file(run_fd, "passive-reboot-resolution.json", limit=16384))
+            except FileNotFoundError:
+                return False
+        try:
+            valid = (record.get("schema_version") == "1.0"
+                     and record.get("kind") == "operator_confirmed_passive_cancel_after_reboot"
+                     and record.get("operator_confirmed") is True
+                     and record.get("run_id") == run_id and record.get("target_id") == state["target_id"]
+                     and record.get("target_digest") == state["target_digest"]
+                     and str(UUID(record["previous_boot_id"])) == record["previous_boot_id"]
+                     and str(UUID(record["current_boot_id"])) == record["current_boot_id"]
+                     and record["previous_boot_id"] != record["current_boot_id"]
+                     and _PUBLIC_HOST_KEY_FINGERPRINT.fullmatch(record["host_key_fingerprint"]) is not None
+                     and self._resolution_audit_matches(record.get("audit_digest"), events)
+                     and record.get("evidence_digest") == self._snapshot_digest(state["evidence"])
+                     and self._passive_cancel_candidate(run_id, state, events))
+        except (ValueError, TypeError, KeyError, AttributeError):
+            valid = False
+        if not valid:
+            raise StorageError("invalid or stale passive reboot resolution")
+        return True
+
+    def resolve_passive_cancel_after_reboot(self, run_id: str, *, previous_boot_id: str,
+                                          current_boot_id: str, host_key_fingerprint: str,
+                                          target_digest: str, operator_confirmed: bool) -> dict:
+        """Local operator action, never an MCP tool or automatic startup policy.
+
+        The caller independently verifies both boot observations and the same
+        registered SSH identity. Only one closed, cancelled passive board call
+        is eligible. Historical state, report, evidence and audit remain intact.
+        """
+        if self._read_only or operator_confirmed is not True:
+            raise StorageError("explicit local operator confirmation required")
+        try:
+            if (str(UUID(previous_boot_id)) != previous_boot_id or str(UUID(current_boot_id)) != current_boot_id
+                    or previous_boot_id == current_boot_id
+                    or _PUBLIC_HOST_KEY_FINGERPRINT.fullmatch(host_key_fingerprint) is None):
+                raise ValueError("unverified reboot")
+        except (ValueError, TypeError, AttributeError):
+            raise StorageError("independent reboot and SSH identity evidence required") from None
+        initial = self.load_state(run_id)
+        target_id = _identifier(initial["target_id"])
+        with self.target_lock(target_id), ExitStack() as locks:
+            target_runs = []
+            for candidate in self.list_runs():
+                candidate_state = self.load_state(candidate)
+                if candidate_state.get("target_id") == target_id:
+                    locks.enter_context(self.run_lock(candidate))
+                    target_runs.append(candidate)
+            state, events = self.load_state(run_id), self.read_events(run_id)
+            if (state.get("target_digest") != target_digest
+                    or not self._passive_cancel_candidate(run_id, state, events)):
+                raise StorageError("only a matching closed passive board cancellation is eligible")
+            for candidate in target_runs:
+                other = self.load_state(candidate)
+                if candidate != run_id and (other.get("pending_operation") is not None
+                                           or other.get("remote_state") in ("unknown", "running")):
+                    if not self._passive_reboot_resolved(candidate, other, self.read_events(candidate)):
+                        raise StorageError("another unresolved target operation exists")
+            with self._lock("quarantine", target_id), self._area("quarantine") as quarantine_fd:
+                quarantine = self._decode(self._read_file(quarantine_fd, target_id + ".json", limit=16384))
+                if (quarantine.get("target_id") != target_id or quarantine.get("error_code") != "remote_state_unknown"
+                        or quarantine.get("reason") not in {"Remote operation completion is uncertain",
+                                                           "Interrupted remote operation; completion is unconfirmed"}):
+                    raise StorageError("quarantine reason requires separate review")
+                record = {"schema_version": "1.0", "kind": "operator_confirmed_passive_cancel_after_reboot",
+                          "operator_confirmed": True, "run_id": run_id, "target_id": target_id,
+                          "target_digest": target_digest, "previous_boot_id": previous_boot_id,
+                          "current_boot_id": current_boot_id, "host_key_fingerprint": host_key_fingerprint,
+                          "audit_digest": self._snapshot_digest(events),
+                          "evidence_digest": self._snapshot_digest(state["evidence"]),
+                          "original_quarantine": quarantine}
+                with self._run(run_id) as run_fd:
+                    self._atomic_json(run_fd, "passive-reboot-resolution.json", record)
+                # The durable resolution precedes removal; a crash earlier
+                # leaves quarantine intact, and later startup cannot replay IO.
+                os.unlink(target_id + ".json", dir_fd=quarantine_fd)
+                os.fsync(quarantine_fd)
+                return record
+
     def request_cancel(self, run_id: str) -> None:
         """Persist cancellation without waiting for a remote worker's run lock."""
         _identifier(run_id)
@@ -482,7 +607,8 @@ class RunStore:
             pending: set[str] = set()
             completed: set[str] = set()
             journal_unknown = False
-            for event in self.read_events(run_id):
+            events = self.read_events(run_id)
+            for event in events:
                 operation_id = event.get("operation_id", event.get("execution_id"))
                 if event.get("action") == "before":
                     operation_id = _identifier(operation_id)
@@ -493,6 +619,8 @@ class RunStore:
                     pending.discard(operation_id)
                     completed.add(operation_id)
                     journal_unknown |= event.get("remote_state_unknown") is True
+            if self._passive_reboot_resolved(run_id, state, events):
+                return state  # Old run remains terminal/unknown; no replay or rewritten evidence.
             marker = state.get("pending_operation")
             if marker is not None:
                 if type(marker) is not dict:

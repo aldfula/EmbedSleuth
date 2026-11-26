@@ -66,8 +66,18 @@ def app_server(codex, project, temporary):
     environment["CODEX_HOME"] = str(probe_home)
     environment.pop("OPENAI_API_KEY", None)
     environment.pop("OPENAI_BASE_URL", None)
+    # Invocation overrides also win over a real project .codex/config.toml.
+    # The isolated check must never initialize the operator's diagnostic store.
+    overrides = ["-c", f"mcp_servers.embedsleuth.command={quote(sys.executable)}",
+                 "-c", f"mcp_servers.embedsleuth.args={json.dumps(['-I', '-m', 'embedsleuth.mcp_server', '--config', str(targets)])}"]
+    with host_process(codex, project, temporary, environment, overrides) as process:
+        yield process
+
+
+@contextmanager
+def host_process(codex, project, temporary, environment=None, overrides=()):
     with (temporary / "host-stderr.log").open("wb") as errors:
-        process = subprocess.Popen([codex, "app-server", "--listen", "stdio://"],
+        process = subprocess.Popen([codex, *overrides, "app-server", "--listen", "stdio://"],
             cwd=project, env=environment, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
             stderr=errors, bufsize=0)
         try:
@@ -84,6 +94,43 @@ def app_server(codex, project, temporary):
                     process.kill()
                     process.wait(timeout=2)
             process.stdout.close()
+
+
+def check_project(codex, project):
+    """Read actual project discovery/trust; no model turns or diagnostic calls."""
+    from embedsleuth.tools import tool_input_schemas
+
+    with tempfile.TemporaryDirectory(prefix="embedsleuth-project-check-") as directory:
+        with host_process(codex, project, Path(directory)) as process:
+            request(process, 1, "initialize", {
+                "clientInfo": {"name": "embedsleuth-project-check", "version": "0.1.0"},
+                "capabilities": {"experimentalApi": True}})
+            process.stdin.write(b'{"method":"initialized"}\n')
+            # Project registrations are resolved in a thread's cwd, whereas
+            # the app-server's global MCP inventory uses user config only.
+            # Ephemeral acceptance context has no model turn or saved chat.
+            started = request(process, 2, "thread/start", {"cwd": str(project), "ephemeral": True})
+            thread_id = started["thread"]["id"]
+            listing = request(process, 3, "mcpServerStatus/list", {"serverName": "embedsleuth", "threadId": thread_id,
+                                                                  "detail": "toolsAndAuthOnly"})
+            servers = [item for item in listing["data"] if item["name"] == "embedsleuth"]
+            if len(servers) != 1 or {tool["name"]: tool["inputSchema"] for tool in servers[0]["tools"].values()} != tool_input_schemas():
+                raise ProbeError("Project MCP server is missing or incompatible")
+            listing = request(process, 4, "hooks/list", {"threadId": thread_id})
+            entries = [entry for entry in listing["data"] if Path(entry["cwd"]) == project]
+            if len(entries) != 1 or entries[0]["errors"]:
+                raise ProbeError("Project hook discovery failed")
+            hooks = [item for item in entries[0]["hooks"] if Path(item["sourcePath"]) == project / ".codex/hooks.json"]
+            if len(hooks) != 3 or {item["eventName"] for item in hooks} != {"preToolUse", "postToolUse", "stop"}:
+                raise ProbeError("Expected three project hooks")
+            listing = request(process, 5, "skills/list", {"cwds": [str(project)], "forceReload": True})
+            skills = [skill for entry in listing["data"] if Path(entry["cwd"]) == project
+                      for skill in entry["skills"] if skill["name"] == "diagnose-mpu6050" and skill["enabled"]]
+            if len(skills) != 1:
+                raise ProbeError("Project skill is missing")
+    return {"mode": "project-settings", "tool_count": 9, "skill_count": len(skills),
+            "hook_trust": {item["eventName"]: item["trustStatus"] for item in hooks},
+            "ephemeral_contexts": 1, "model_turns": 0, "diagnostic_calls": 0}
 
 
 def check(codex, project):
@@ -141,12 +188,13 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--codex", default="codex", help="Installed Codex CLI executable")
     parser.add_argument("--project", type=Path, default=Path(__file__).resolve().parents[1])
+    parser.add_argument("--project-settings", action="store_true", help="Inspect actual project registration/trust instead of isolated fixtures")
     args = parser.parse_args()
     codex = shutil.which(args.codex)
     if not codex:
         parser.exit(2, "Codex CLI is not installed\n")
     try:
-        result = check(codex, args.project.resolve())
+        result = (check_project if args.project_settings else check)(codex, args.project.resolve())
     except (ProbeError, OSError, ValueError, KeyError):
         parser.exit(1, "Codex discovery check failed; check the installed host version and repository skill\n")
     print(json.dumps(result, ensure_ascii=False))

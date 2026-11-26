@@ -337,7 +337,8 @@ class HookChecks:
         with _Journal(self.journal_path) as journal, journal._lock("hook", context):
             entry = journal.entry(context)
             try:
-                if any(not call["done"] for call in entry["calls"].values()):
+                incomplete = [call for call in entry["calls"].values() if not call["done"]]
+                if any(call["tool"] not in REMOTE or call.get("issue") for call in incomplete):
                     raise ValueError("unverified call")
                 for run_id in entry["runs"]:
                     with self.snapshot(run_id, config) as (store, state):
@@ -346,6 +347,12 @@ class HookChecks:
                             raise ValueError("unclosed run")
                         for record in report.evidence:
                             self.audit(store, state, record.result)
+                if incomplete:
+                    # A host can omit PostToolUse on an error. Once every run
+                    # and durable remote audit is closed, another get_report
+                    # cannot recreate that missing event. Preserve receipts as
+                    # unverified and warn, without requesting a futile repair.
+                    return advisory("Stop")
             except (OSError, ValueError, KeyError, TypeError):
                 if payload.get("stop_hook_active") is True or entry["warned"]:
                     return advisory("Stop")

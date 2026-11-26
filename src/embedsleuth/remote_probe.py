@@ -256,7 +256,40 @@ def dispatch(request):
     return read_device_identity(request)
 
 
+def resource_usage(started):
+    """Linux probe + one waited transfer child's conservative RSS bound.
+
+    RUSAGE_CHILDREN is the largest waited child's peak, not a tree total.
+    This probe launches at most one child. SSH/shell/other services are outside
+    this measurement; do not present it as system-wide incremental memory.
+    """
+    if sys.platform != "linux":
+        return {"available": False}
+    try:
+        import resource
+
+        own = resource.getrusage(resource.RUSAGE_SELF)
+        child = resource.getrusage(resource.RUSAGE_CHILDREN)
+        own_rss, child_rss = int(own.ru_maxrss), int(child.ru_maxrss)
+        if own_rss <= 0 or child_rss < 0:
+            return {"available": False}
+        stat_text = read_fixed_file("/proc/self/stat")
+        start_ticks = stat_text.rsplit(")", 1)[1].split()[19] if stat_text else None
+        return {
+            "schema_version": "1.0", "available": True,
+            "measurement": "linux_getrusage", "scope": "probe_and_single_waited_child",
+            "probe_peak_rss_kib": own_rss, "child_peak_rss_kib": child_rss,
+            "peak_sum_bound_kib": own_rss + child_rss,
+            "elapsed_ms": max(0, int((time.monotonic() - started) * 1000)),
+            "cpu_ms": max(0, int((own.ru_utime + own.ru_stime + child.ru_utime + child.ru_stime) * 1000)),
+            "pid": os.getpid(), "process_start_ticks": start_ticks,
+        }
+    except (ImportError, OSError, ValueError, IndexError, AttributeError):
+        return {"available": False}
+
+
 def main():
+    started = time.monotonic()
     try:
         wire = sys.stdin.buffer.read(MAX_REQUEST + 1)
         if len(wire) > MAX_REQUEST:
@@ -266,6 +299,11 @@ def main():
         result = response("blocked", "invalid_request", "Invalid probe request")
     except Exception:
         result = response("error", "transfer_failed", "Remote inspection failed", remote_state_unknown=True)
+    # Metrics are observations only; they never authorize a transfer or alter
+    # execution status. Failure to measure is explicitly unknown, not zero.
+    result["observations"]["resource_usage"] = resource_usage(started)
+    # Membership is evidence for development memory accounting, not IO policy.
+    result["observations"]["process_cgroup"] = read_fixed_file("/proc/self/cgroup")
     sys.stdout.write(json.dumps(result, ensure_ascii=True, allow_nan=False))
 
 

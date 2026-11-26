@@ -109,6 +109,44 @@ def test_active_stop_hook_never_blocks_even_first_time(setup_hooks):
     assert "decision" not in hook(h, "Stop", stop_hook_active=True)
 
 
+@pytest.mark.parametrize("remote_error", [True, False])
+def test_closed_run_with_missing_remote_post_warns_without_futile_repair(setup_hooks, remote_error):
+    from embedsleuth.hooks import _Journal, _context
+    from embedsleuth.mcp_server import _response
+    from embedsleuth.transport import ProbeResponse
+    h = setup_hooks
+    run = h.core.start_diagnosis("lab-pi")["run_id"]
+    args = {"run_id": run}
+    assert hook(h, "PreToolUse", arguments=args) == {}
+    if remote_error:
+        h.transport.overrides["inspect_target"] = ProbeResponse(
+            status="error", error_code="authentication_failed", message="Authentication unavailable")
+    h.core.inspect_target(run)  # Host deliberately omits PostToolUse.
+    assert hook(h, "PreToolUse", "finalize_report", args, "final") == {}
+    report = h.core.finalize_report(run)
+    raw = _response(report).model_dump(mode="json", by_alias=True)
+    assert hook(h, "PostToolUse", "finalize_report", args, "final", tool_response=raw) == {}
+    for active in (False, True, False):
+        output = hook(h, "Stop", stop_hook_active=active)
+        assert "systemMessage" in output and "decision" not in output
+    with _Journal.open_reader(h.journal) as journal:
+        entry = journal.entry(_context(payload("Stop")))
+    assert any(call["tool"] == "inspect_target" and not call["done"] for call in entry["calls"].values())
+    assert h.transport.count("inspect_target") == 1
+
+
+def test_missing_remote_post_cannot_hide_pending_remote_operation(setup_hooks):
+    h = setup_hooks
+    run = ready(h, mode="passive")
+    args = {"run_id": run}
+    assert hook(h, "PreToolUse", arguments=args) == {}
+    h.core.finalize_report(run)
+    state = h.store.load_state(run)
+    state["pending_operation"] = {"tool": "inspect_target", "operation_id": "unfinished"}
+    h.store.save_state(run, state)
+    assert hook(h, "Stop")["decision"] == "block"
+
+
 def test_unrelated_tool_and_stop_do_not_open_config_or_create_store(tmp_path):
     missing = tmp_path / "missing"
     for event in ("PreToolUse", "PostToolUse"):
