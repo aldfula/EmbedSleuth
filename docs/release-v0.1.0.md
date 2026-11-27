@@ -11,7 +11,7 @@ Raspberry Pi 3와 MPU6050의 I2C 연결·인식 문제를 기존 AI 호스트의
 
 ## 설치
 
-Assets의 wheel·constraints-runtime.txt·SHA256SUMS를 받는다. [새 PC 설치 안내](https://github.com/aldfula/EmbedSleuth/blob/v0.1.0/docs/installation.md) 또는 첨부 INSTALL.md를 따른다. PyPI 배포는 하지 않았다. 의존성 다운로드에 인터넷이 필요하고, SSH 준비·대상 등록·훅 신뢰는 운영자가 수행한다.
+2026-11-27에 기존 Release와 같은 wheel·sdist를 [PyPI](https://pypi.org/project/embedsleuth/0.1.0/)에도 게시했다. Linux 개발 PC의 전용 가상환경에서 `pip install embedsleuth==0.1.0`으로 설치하고 [최신 설치 안내](https://github.com/aldfula/EmbedSleuth/blob/main/docs/installation.md)를 따른다. GitHub Assets의 wheel·constraints-runtime.txt·SHA256SUMS와 첨부 INSTALL.md를 이용하는 설치도 가능하다. 의존성 다운로드에 인터넷이 필요하고, SSH 준비·대상 등록·훅 신뢰는 운영자가 수행한다. 기존 v0.1.0 태그와 첨부 문서는 변경하지 않았다.
 
 ## 검증 범위
 

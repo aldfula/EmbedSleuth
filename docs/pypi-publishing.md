@@ -1,6 +1,6 @@
 # PyPI 게시 절차
 
-현재 v0.1.0은 GitHub Release에 게시되어 있으며, PyPI 게시를 준비 중이다. PyPI 업로드와 공개 인덱스 설치 검증 전에는 `pip install embedsleuth`가 가능하다고 간주하지 않는다.
+2026-11-27에 기존 GitHub Release의 v0.1.0 wheel·sdist를 [PyPI](https://pypi.org/project/embedsleuth/0.1.0/)에 게시했다. 공개 인덱스에서 패키지 이름으로 설치하고 MCP·스킬·훅 검증까지 통과했다. Linux 개발 PC의 전용 가상환경에서 `pip install embedsleuth`로 설치할 수 있다.
 
 ## 게시 파일과 경계
 
@@ -50,6 +50,11 @@ gh workflow run pypi-publish.yml --repo aldfula/EmbedSleuth --ref main -f publis
 - 전체 자동 회귀 **781 passed in 64.62s**, 경고 오류 처리. 실제 Pi·모델 호출 없음.
 - 기존 wheel과 sdist의 `twine check --strict` 통과.
 - GitHub [검증 실행 45914544501](https://github.com/aldfula/EmbedSleuth/actions/runs/45914544501) 성공(`e04c680`, validate 13초). 기존 공개 Release 다운로드·해시·배포 wheel 설치·의존성·MCP/훅 검사와 산출물 전달이 통과했으며 `publish` 작업은 실행하지 않았다.
-- GitHub `pypi` environment의 허용 배포 브랜치는 `main` 한 개임을 확인했다. PyPI 게시와 공개 인덱스 설치 검증은 계정 인증·Publisher 등록 후 진행한다.
+- GitHub `pypi` environment의 허용 배포 브랜치는 `main` 한 개임을 확인했다. 운영자의 계정 인증 완료와 구체적인 게시 권한 승인 후 Pending Publisher를 등록했다.
+- 실제 [게시 실행 45915581385](https://github.com/aldfula/EmbedSleuth/actions/runs/45915581385) 성공(`7b2fc2f`, validate 15초, publish 20초). OIDC 인증과 디지털 attestation을 사용했다. GitHub 작업 커밋과 배포 파일의 소스 커밋은 서로 다르며 후자는 매니페스트에 고정되어 있다.
+- 공개 PyPI JSON의 이름·버전·파일 두 개·SHA-256이 매니페스트와 일치하고 yanked 상태가 아님을 확인했다. GitHub Release와 같은 바이트다.
+- 저장소 밖의 새 Linux/Python 3.12.14 가상환경에서 `pip --isolated install --index-url https://pypi.org/simple embedsleuth==0.1.0` 성공. 런타임 제약 파일을 사용하지 않았다. 설치 보고서의 wheel 출처는 `files.pythonhosted.org`이고 SHA-256도 일치했다. 선택된 주요 의존성은 Pydantic 2.14.4, Paramiko 4.0.0, MCP 2.3.0, AnyIO 4.16.0이다.
+- `pip check`와 실제 `scripts/check_release_install.py` 성공: 스킬 자료·새 작업 폴더·생산 MCP 도구 9개·Pre/Post/Stop 훅 3개. 등록 대상 0개·장치 검사 0회·모델 0턴·훅 신뢰 부여 없음.
+- 기존 배포 파일을 보존했으므로 PyPI v0.1.0 설명은 GitHub 설치를 안내하던 README다. 설명 본문의 상대 문서 링크는 PyPI에서 열리지 않으며 Metadata의 Documentation 링크 또는 [최신 설치 문서](https://github.com/aldfula/EmbedSleuth/blob/main/docs/installation.md)를 사용한다. 이 문서 한계 때문에 이미 게시된 파일을 바꾸거나 재업로드하지 않는다.
 
 근거: [PyPI Pending Publisher](https://docs.pypi.org/trusted-publishers/creating-a-project-through-oidc/), [Trusted Publisher 설정](https://docs.pypi.org/trusted-publishers/adding-a-publisher/), [공식 PyPI 게시 Action](https://github.com/pypa/gh-action-pypi-publish).

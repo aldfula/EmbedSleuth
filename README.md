@@ -17,7 +17,13 @@ Pi에 LLM·MCP 서버·상주 에이전트를 설치하지 않습니다. EmbedSl
 
 ## 설치
 
-Linux 개발 PC에서 [v0.1.0 GitHub Release](https://github.com/aldfula/EmbedSleuth/releases/tag/v0.1.0)의 wheel·런타임 버전 파일·해시를 받아 설치합니다. 저장소 복제 없이 스킬·MCP·훅 연결 자료를 준비할 수 있습니다. [새 PC 설치 안내](docs/installation.md)를 따르세요. SSH 대상 등록과 호스트의 훅 신뢰 검토는 운영자가 수행합니다.
+Linux 개발 PC의 Python 3.11 이상 전용 가상환경에서 [PyPI 패키지](https://pypi.org/project/embedsleuth/)를 설치합니다. 검증 환경은 Python 3.12입니다.
+
+```bash
+pip install embedsleuth
+```
+
+처음 가상환경을 만들고 `embedsleuth-setup`으로 스킬·MCP·훅 연결 자료를 준비하는 절차는 [새 PC 설치 안내](https://github.com/aldfula/EmbedSleuth/blob/main/docs/installation.md)를 따르세요. 저장소 복제는 필요하지 않습니다. SSH 대상 등록과 호스트의 훅 신뢰 검토는 운영자가 수행합니다. 같은 배포 파일을 [v0.1.0 GitHub Release](https://github.com/aldfula/EmbedSleuth/releases/tag/v0.1.0)에서도 제공합니다.
 
 ## 현재 구현 상태
 
@@ -36,7 +42,7 @@ Linux 개발 PC에서 [v0.1.0 GitHub Release](https://github.com/aldfula/EmbedSl
 
 별도의 대화형 CLI를 열 필요는 없습니다. 기존 AI 호스트에 서버 실행 명령을 등록하면 호스트가 MCP 프로세스를 시작하고 도구를 호출합니다. Codex CLI의 스킬·MCP·훅 검색은 임시 설정으로 확인했습니다. 운영 훅 활성화에는 호스트의 사용자 검토·신뢰가 필요하며, 실제 모델의 정상 passive 진단은 스킬·생산 MCP·신뢰된 훅·최종 보고까지 검증했습니다. 일반 라우팅 정확도와 다른 호스트로 확대 해석하지 않습니다.
 
-실제 Raspberry Pi 3의 SSH·보드·I2C 환경과 주소 0x68의 WHO_AM_I=0x68 식별을 확인했습니다. 승인된 권한 거부·드라이버 점유·컨트롤러 비활성 시험은 원상복구까지 통과했고, 실행 중 MCP 취소·보고서 보존·관측한 프로세스 종료를 확인했습니다. 메모리는 SSH·로그인 세션을 포함한 커널 과금 메모리 상한 약 38.0MiB로 [MVP의 64MiB 기준](docs/memory-budget-decision.md)을 충족합니다. 프로세스 RSS 합계와는 다른 지표이며 엄격한 전체 추가 RSS는 미측정입니다. 가짜 장치의 실제 모델 평가 3턴은 검토 완료했고, 별도 승인된 실제 Pi·스킬·생산 MCP·훅의 한 턴 통합 검증도 통과했습니다. MCP 6회·원격 환경 조사 2회·센서 전송 0회로 partial 보고서를 보존했고, Pre/Post 각 6회와 Stop 1회가 완료됐습니다. MVP 인수 시 자동 회귀 750개에 배포·설치 회귀 19개를 추가해 최신 769개가 통과했습니다. 0x69 실물 시험은 사용자 결정으로 제외했습니다. [현재 인수 상태](docs/phase6-acceptance.md)
+실제 Raspberry Pi 3의 SSH·보드·I2C 환경과 주소 0x68의 WHO_AM_I=0x68 식별을 확인했습니다. 승인된 권한 거부·드라이버 점유·컨트롤러 비활성 시험은 원상복구까지 통과했고, 실행 중 MCP 취소·보고서 보존·관측한 프로세스 종료를 확인했습니다. 메모리는 SSH·로그인 세션을 포함한 커널 과금 메모리 상한 약 38.0MiB로 [MVP의 64MiB 기준](docs/memory-budget-decision.md)을 충족합니다. 프로세스 RSS 합계와는 다른 지표이며 엄격한 전체 추가 RSS는 미측정입니다. 가짜 장치의 실제 모델 평가 3턴은 검토 완료했고, 별도 승인된 실제 Pi·스킬·생산 MCP·훅의 한 턴 통합 검증도 통과했습니다. MCP 6회·원격 환경 조사 2회·센서 전송 0회로 partial 보고서를 보존했고, Pre/Post 각 6회와 Stop 1회가 완료됐습니다. MVP 인수 시 자동 회귀 750개에 배포·설치 회귀 19개와 PyPI 게시 검증 12개를 추가해 최신 781개가 통과했습니다. 0x69 실물 시험은 사용자 결정으로 제외했습니다. [현재 인수 상태](docs/phase6-acceptance.md)
 
 > EmbedSleuth로 등록된 lab-pi의 MPU6050 인식 문제를 진단해 줘.
 
@@ -114,7 +120,7 @@ Pi 3 Model B / Debian 12 / aarch64 / Python 3.11.2에서 주소 0x68의 WHO_AM_I
 - [Phase 5 훅 설정·신뢰·검증 경계](docs/hooks-usage.md)
 - [Phase 6 인수 결과와 남은 조건](docs/phase6-acceptance.md)
 - [새 PC에 Release 패키지 설치](docs/installation.md)
-- [PyPI 게시 준비·검증 절차](docs/pypi-publishing.md)
+- [PyPI 게시·검증 기록](docs/pypi-publishing.md)
 - [v0.1.0 릴리스 안내](docs/release-v0.1.0.md)
 - [PC 배포·대상 등록·인수 명령](docs/deployment.md)
 - [실제 모델 평가의 전송·허용 범위](docs/model-evaluation-scope.md)

@@ -1,10 +1,25 @@
 # EmbedSleuth v0.1.0 설치
 
-이 문서는 개발 저장소를 복제하지 않고 GitHub Release의 패키지로 설치하는 절차다. **Linux 개발 PC**에서 실행한다. Raspberry Pi에는 설치하지 않는다. 검증한 PC는 Linux x86_64 / Python 3.12.14이고, Pi는 Pi 3 Model B / Debian 12 / aarch64 / Python 3.11.2다. 패키지의 최소 Python은 3.11이나 PC의 3.11 실행 시험은 아직 하지 않았다. Windows·macOS는 이번 배포의 지원 범위 밖이다.
+이 문서는 개발 저장소를 복제하지 않고 PyPI 패키지로 설치하는 절차다. **Linux 개발 PC**에서 실행한다. Raspberry Pi에는 설치하지 않는다. 검증한 PC는 Linux x86_64 / Python 3.12.14이고, Pi는 Pi 3 Model B / Debian 12 / aarch64 / Python 3.11.2다. 패키지의 최소 Python은 3.11이나 PC의 3.11 실행 시험은 아직 하지 않았다. Windows·macOS는 이번 배포의 지원 범위 밖이다.
 
-배포 위치: [v0.1.0 GitHub Release](https://github.com/aldfula/EmbedSleuth/releases/tag/v0.1.0). PyPI에 게시하지 않았으므로 `pip install embedsleuth` 대신 아래 wheel을 설치한다. 인터넷으로 의존성을 내려받는다. AI 호스트의 설치·로그인·사용 한도는 별도이며 EmbedSleuth는 API 키나 LLM 클라이언트를 만들지 않는다.
+배포 위치: [PyPI v0.1.0](https://pypi.org/project/embedsleuth/0.1.0/)과 동일 파일의 [GitHub Release](https://github.com/aldfula/EmbedSleuth/releases/tag/v0.1.0). 인터넷으로 패키지와 의존성을 내려받는다. AI 호스트의 설치·로그인·사용 한도는 별도이며 EmbedSleuth는 API 키나 LLM 클라이언트를 만들지 않는다.
 
-## 1. 다운로드와 확인
+## 1. PC 전용 가상환경에 설치
+
+Python 3.12와 venv를 준비한다. 아래 전용 가상환경 경로가 아직 없는 새 설치 기준이다. 시스템 Python에 sudo로 설치하지 않는다.
+
+```bash
+python3.12 -I -m venv "$HOME/.local/share/embedsleuth/venv"
+source "$HOME/.local/share/embedsleuth/venv/bin/activate"
+pip install embedsleuth==0.1.0
+pip check
+```
+
+전용 가상환경이 활성화되어 있으면 `pip install embedsleuth`로 설치할 수 있다. 위 예는 검증한 버전을 명시한다. wheel에 MCP 서버·훅·스킬·참조·프로필·등록 예제가 포함된다. 일반 설치에는 pytest·PyYAML·빌드 도구가 필요 없다. 다른 장치나 기존 설치와 가상환경 경로를 공유하지 않는다.
+
+2026-11-27에 공개 PyPI에서 새 Linux/Python 3.12 가상환경으로 설치하고, 버전 제약 파일 없이 의존성·새 작업 폴더·생산 STDIO MCP 9개 도구·훅 3개를 검증했다. 설치된 wheel의 SHA-256은 기존 GitHub Release와 같다. 이 설치 확인에는 실제 Pi·모델·운영 설정을 사용하지 않았다.
+
+### GitHub Release 파일로 설치하는 경우
 
 Release에서 아래 세 파일을 같은 새 폴더에 내려받는다.
 
@@ -20,20 +35,15 @@ sha256sum --ignore-missing -c SHA256SUMS
 
 wheel과 constraints-runtime.txt 두 줄 모두 OK인지 확인한다. 출처·해시가 다르면 설치하지 않는다.
 
-## 2. PC 전용 가상환경에 설치
-
-Python 3.12와 venv를 준비하고, 내려받은 폴더에서 실행한다. 시스템 Python에 sudo로 설치하지 않는다.
+위에서 준비한 전용 가상환경에 내려받은 wheel을 설치할 수도 있다. 런타임 버전을 고정해 기존 Release의 의존성을 재현하려면 내려받은 폴더에서 실행한다.
 
 ```bash
-python3.12 -I -m venv "$HOME/.local/share/embedsleuth/venv"
 "$HOME/.local/share/embedsleuth/venv/bin/python" -I -m pip install \
   -c constraints-runtime.txt ./embedsleuth-0.1.0-py3-none-any.whl
 "$HOME/.local/share/embedsleuth/venv/bin/python" -I -m pip check
 ```
 
-wheel에 MCP 서버·훅·스킬·참조·프로필·등록 예제가 포함된다. 일반 설치에는 pytest·PyYAML·빌드 도구가 필요 없다. 다른 장치나 기존 설치와 가상환경 경로를 공유하지 않는다.
-
-## 3. 새 작업 폴더 만들기
+## 2. 새 작업 폴더 만들기
 
 **처음 설치하는 PC에서만** 빈 대상 등록과 새 증거 저장소를 만든다. 아래 세 경로가 아직 없어야 한다. 작업 폴더의 부모는 미리 존재해야 하며 상대 경로·`..`·심볼릭 링크가 들어간 경로는 받지 않는다.
 
@@ -67,7 +77,7 @@ wheel에 MCP 서버·훅·스킬·참조·프로필·등록 예제가 포함된�
   --config /ABSOLUTE/PATH/EXISTING/targets.json
 ```
 
-## 4. 운영 대상 등록과 호스트 연결
+## 3. 운영 대상 등록과 호스트 연결
 
 작업 폴더의 targets.example.json에서 대상 객체를 참고해 비공개 등록 파일의 targets 배열을 편집한다. **원래 state_directory는 유지**한다. host·username·known_hosts_path·key_path·expected_bus·expected_addresses를 운영 환경에 맞춘다. 비밀번호나 개인키 내용을 넣지 않는다. `conflicting_use_excluded`는 처음에 false로 유지한다.
 
@@ -75,7 +85,7 @@ PC에서 운영자가 SSH 연결·호스트 키 지문·키 인증·Pi의 기존
 
 Codex에서 새 작업 폴더를 연다. 프로젝트 설정과 스킬을 확인하고, 훅 세 개의 명령·경로를 검토한 뒤 호스트 UI에서 신뢰한다. 신뢰나 도구 승인이 필요하다는 호스트 요청을 검토한다. 설치 명령으로 신뢰를 자동 부여하지 않는다. 다른 프로젝트의 기존 설정에 추가하려면 해당 스킬과 MCP·훅 항목을 검토해 직접 병합한다. 생성기를 기존 프로젝트에 덮어쓰는 용도로 사용하지 않는다.
 
-## 5. 사용 확인
+## 4. 사용 확인
 
 먼저 장치 접근 없는 프로필 요청을 한다.
 
