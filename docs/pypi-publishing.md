@@ -49,6 +49,7 @@ gh workflow run pypi-publish.yml --repo aldfula/EmbedSleuth --ref main -f publis
 - 게시 파일 검증 회귀 12개 통과. 변조·누락·링크·다른 메타데이터·허용되지 않은 파일 목록을 거부한다.
 - 전체 자동 회귀 **781 passed in 64.62s**, 경고 오류 처리. 실제 Pi·모델 호출 없음.
 - 기존 wheel과 sdist의 `twine check --strict` 통과.
-- GitHub 실행 결과와 실제 PyPI 게시 여부는 배포 실행 후 기록한다.
+- GitHub [검증 실행 45914544501](https://github.com/aldfula/EmbedSleuth/actions/runs/45914544501) 성공(`e04c680`, validate 13초). 기존 공개 Release 다운로드·해시·배포 wheel 설치·의존성·MCP/훅 검사와 산출물 전달이 통과했으며 `publish` 작업은 실행하지 않았다.
+- GitHub `pypi` environment의 허용 배포 브랜치는 `main` 한 개임을 확인했다. PyPI 게시와 공개 인덱스 설치 검증은 계정 인증·Publisher 등록 후 진행한다.
 
 근거: [PyPI Pending Publisher](https://docs.pypi.org/trusted-publishers/creating-a-project-through-oidc/), [Trusted Publisher 설정](https://docs.pypi.org/trusted-publishers/adding-a-publisher/), [공식 PyPI 게시 Action](https://github.com/pypa/gh-action-pypi-publish).
