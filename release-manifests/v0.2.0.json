@@ -1,0 +1,10 @@
+{
+  "project": "embedsleuth",
+  "version": "0.2.0",
+  "source_commit": "2d769c7348661b56b96c36291325809ce9041061",
+  "files": {
+    "constraints-runtime.txt": "740b6624f51ea2116532e92ba268f9fbc694f46d11bd1d9498e5504defd5b17d",
+    "embedsleuth-0.2.0-py3-none-any.whl": "9fa2877e92466fd161f417734377339639de07f76bdaf36e4cb91881ee3ad71c",
+    "embedsleuth-0.2.0.tar.gz": "6cb78e05cc9da690e81b579e34f25d2820b462fad3517871d064c9352fa0c38e"
+  }
+}
