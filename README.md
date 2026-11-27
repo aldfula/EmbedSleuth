@@ -114,6 +114,7 @@ Pi 3 Model B / Debian 12 / aarch64 / Python 3.11.2에서 주소 0x68의 WHO_AM_I
 - [Phase 5 훅 설정·신뢰·검증 경계](docs/hooks-usage.md)
 - [Phase 6 인수 결과와 남은 조건](docs/phase6-acceptance.md)
 - [새 PC에 Release 패키지 설치](docs/installation.md)
+- [PyPI 게시 준비·검증 절차](docs/pypi-publishing.md)
 - [v0.1.0 릴리스 안내](docs/release-v0.1.0.md)
 - [PC 배포·대상 등록·인수 명령](docs/deployment.md)
 - [실제 모델 평가의 전송·허용 범위](docs/model-evaluation-scope.md)
