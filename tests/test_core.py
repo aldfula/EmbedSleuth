@@ -119,6 +119,32 @@ def test_happy_diagnosis_has_real_identity_evidence_and_persisted_report(make_ha
     assert not {"command", "register", "force"}.intersection(request)
 
 
+def test_final_report_lookup_preserves_snapshot_without_rejudging_or_writing(make_harness, monkeypatch):
+    h = make_harness()
+    run = ready(h)
+    read(h, run)
+    report = h.core.finalize_report(run)
+
+    def forbidden(*args, **kwargs):
+        raise AssertionError("A finalized snapshot must not be rejudged or rewritten on lookup")
+
+    monkeypatch.setattr(h.core, "_build_report", forbidden)
+    monkeypatch.setattr(h.store, "save_report", forbidden)
+    assert h.core.get_report(run) == report
+
+
+def test_final_report_lookup_still_detects_new_interruption(make_harness):
+    h = make_harness()
+    run = ready(h)
+    read(h, run)
+    assert h.core.finalize_report(run).outcome == "complete"
+    state = h.store.load_state(run)
+    state["remote_state"] = "unknown"
+    h.store.save_state(run, state)
+    assert h.core.get_report(run).outcome == "interrupted"
+    assert h.store.is_quarantined(h.target.target_id)
+
+
 def test_identity_mismatch_does_not_claim_dead_sensor_or_complete_missing_coverage(make_harness):
     h = make_harness()
     h.transport.overrides["read_device_identity"] = {"identity_value": 0}

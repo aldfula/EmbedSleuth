@@ -1,8 +1,10 @@
-# EmbedSleuth v0.1.0 설치
+# EmbedSleuth v0.2.0 설치
 
 이 문서는 개발 저장소를 복제하지 않고 PyPI 패키지로 설치하는 절차다. **Linux 개발 PC**에서 실행한다. Raspberry Pi에는 설치하지 않는다. 검증한 PC는 Linux x86_64 / Python 3.12.14이고, Pi는 Pi 3 Model B / Debian 12 / aarch64 / Python 3.11.2다. 패키지의 최소 Python은 3.11이나 PC의 3.11 실행 시험은 아직 하지 않았다. Windows·macOS는 이번 배포의 지원 범위 밖이다.
 
-배포 위치: [PyPI v0.1.0](https://pypi.org/project/embedsleuth/0.1.0/)과 동일 파일의 [GitHub Release](https://github.com/aldfula/EmbedSleuth/releases/tag/v0.1.0). 인터넷으로 패키지와 의존성을 내려받는다. AI 호스트의 설치·로그인·사용 한도는 별도이며 EmbedSleuth는 API 키나 LLM 클라이언트를 만들지 않는다.
+배포 위치: [PyPI v0.2.0](https://pypi.org/project/embedsleuth/0.2.0/)과 동일 파일의 [GitHub Release](https://github.com/aldfula/EmbedSleuth/releases/tag/v0.2.0). 인터넷으로 패키지와 의존성을 내려받는다. AI 호스트의 설치·로그인·사용 한도는 별도이며 EmbedSleuth는 API 키나 LLM 클라이언트를 만들지 않는다.
+
+v0.2.0의 실제 Pi·설치 인수 범위는 [검증 기록](v0.2.0-verification.md)을 따른다. 기존 pipx 설치는 `pipx upgrade embedsleuth`로 갱신한 뒤 작업할 프로젝트에서 `embedsleuth-setup --in-place --config /ABSOLUTE/PATH/targets.json`을 실행한다. 기존 MCP 연결을 종료·재연결해야 새 코드를 사용한다.
 
 ## 1. PC에 설치
 
@@ -13,19 +15,19 @@ pipx와 직접 가상환경을 만드는 방법 중 하나를 선택한다.
 pipx와 Python 3.12가 준비되어 있다면 다음과 같이 설치한다. pipx 자체의 설치는 [공식 설치 안내](https://pipx.pypa.io/stable/how-to/install-pipx.html)를 따른다.
 
 ```bash
-pipx install --python python3.12 embedsleuth==0.1.0
+pipx install --python python3.12 embedsleuth==0.2.0
 embedsleuth-setup --help
 ```
 
-pipx의 기본 Python이 3.11 이상이면 `pipx install embedsleuth`도 사용할 수 있다. pipx가 앱별 가상환경을 관리하므로 사용 시 직접 활성화하지 않는다. 설치가 끝나면 `embedsleuth-setup`, `embedsleuth-mcp`, `embedsleuth-hook` 명령을 제공한다. 명령을 찾지 못하면 `pipx ensurepath` 후 새 터미널에서 다시 확인한다. 이 명령은 셸의 PATH 설정을 갱신한다.
+pipx의 기본 Python이 3.11 이상이면 `pipx install embedsleuth`도 사용할 수 있다. pipx가 앱별 가상환경을 관리하므로 사용 시 직접 활성화하지 않는다. 설치가 끝나면 `embedsleuth-setup`, `embedsleuth-mcp`, `embedsleuth-hook`, `embedsleuth-approve-sampling` 명령을 제공한다. 명령을 찾지 못하면 `pipx ensurepath` 후 새 터미널에서 다시 확인한다. 이 명령은 셸의 PATH 설정을 갱신한다.
 
-2026-11-27에 Linux/Python 3.12.14/pipx 1.19.1의 pip 백엔드로 공개 PyPI의 `embedsleuth`를 설치했다. 배포본 SHA-256 일치, 세 명령어의 PATH 실행, 실제 setup 명령의 새 작업 폴더 생성, 생성 설정이 pipx Python을 사용하는 것, 의존성, 생산 MCP 9개 도구, 스킬, 훅 3개를 확인했다. 시험은 임시 PIPX_HOME·명령 경로에서 가상환경 활성화 없이 수행했다. 사용자 셸 설정·운영 설정·실제 Pi·모델은 사용하지 않았다. 다른 pipx 버전이나 uv 백엔드 실행 검증으로 확대 해석하지 않는다.
+v0.1.0의 과거 검증: 2026-11-27에 Linux/Python 3.12.14/pipx 1.19.1의 pip 백엔드로 공개 PyPI의 `embedsleuth`를 설치했다. 배포본 SHA-256 일치, 세 명령어의 PATH 실행, 실제 setup 명령의 새 작업 폴더 생성, 생성 설정이 pipx Python을 사용하는 것, 의존성, 생산 MCP 9개 도구, 스킬, 훅 3개를 확인했다. 시험은 임시 PIPX_HOME·명령 경로에서 가상환경 활성화 없이 수행했다. 사용자 셸 설정·운영 설정·실제 Pi·모델은 사용하지 않았다. 다른 pipx 버전이나 uv 백엔드 실행 검증으로 확대 해석하지 않는다.
 
 pipx 설치 후 **새 PC의 새 등록**을 준비하는 예다. 아래 경로가 아직 없어야 한다.
 
 ```bash
 embedsleuth-setup \
-  --directory "$HOME/embedsleuth-workspace" \
+  --in-place \
   --config "$HOME/.config/embedsleuth/targets.json" \
   --init-config \
   --state-directory "$HOME/.embedsleuth-state"
@@ -42,19 +44,19 @@ Python 3.12와 venv를 준비한다. 아래 전용 가상환경 경로가 아직
 ```bash
 python3.12 -I -m venv "$HOME/.local/share/embedsleuth/venv"
 source "$HOME/.local/share/embedsleuth/venv/bin/activate"
-pip install embedsleuth==0.1.0
+pip install embedsleuth==0.2.0
 pip check
 ```
 
 전용 가상환경이 활성화되어 있으면 `pip install embedsleuth`로 설치할 수 있다. 위 예는 검증한 버전을 명시한다. wheel에 MCP 서버·훅·스킬·참조·프로필·등록 예제가 포함된다. 일반 설치에는 pytest·PyYAML·빌드 도구가 필요 없다. 다른 장치나 기존 설치와 가상환경 경로를 공유하지 않는다.
 
-2026-11-27에 공개 PyPI에서 새 Linux/Python 3.12 가상환경으로 설치하고, 버전 제약 파일 없이 의존성·새 작업 폴더·생산 STDIO MCP 9개 도구·훅 3개를 검증했다. 설치된 wheel의 SHA-256은 기존 GitHub Release와 같다. 이 설치 확인에는 실제 Pi·모델·운영 설정을 사용하지 않았다.
+v0.1.0의 과거 검증: 2026-11-27에 공개 PyPI에서 새 Linux/Python 3.12 가상환경으로 설치하고, 버전 제약 파일 없이 의존성·새 작업 폴더·생산 STDIO MCP 9개 도구·훅 3개를 검증했다. 설치된 wheel의 SHA-256은 기존 GitHub Release와 같다. 이 설치 확인에는 실제 Pi·모델·운영 설정을 사용하지 않았다.
 
 ### GitHub Release 파일로 설치하는 경우
 
 Release에서 아래 세 파일을 같은 새 폴더에 내려받는다.
 
-- `embedsleuth-0.1.0-py3-none-any.whl`
+- `embedsleuth-0.2.0-py3-none-any.whl`
 - `constraints-runtime.txt`
 - `SHA256SUMS`
 
@@ -70,7 +72,7 @@ wheel과 constraints-runtime.txt 두 줄 모두 OK인지 확인한다. 출처·�
 
 ```bash
 "$HOME/.local/share/embedsleuth/venv/bin/python" -I -m pip install \
-  -c constraints-runtime.txt ./embedsleuth-0.1.0-py3-none-any.whl
+  -c constraints-runtime.txt ./embedsleuth-0.2.0-py3-none-any.whl
 "$HOME/.local/share/embedsleuth/venv/bin/python" -I -m pip check
 ```
 
@@ -130,7 +132,7 @@ $diagnose-mpu6050로 MPU6050 프로필의 식별 조건만 알려 줘. 장치 �
 $diagnose-mpu6050로 등록된 lab-pi의 환경만 passive로 조사해 줘. 센서 통신은 하지 마.
 ```
 
-센서 식별 읽기는 그때의 예상 주소·다른 I2C 작업 중지 확인과 유효한 로컬 운영 선언이 필요하다. 설치가 끝났다는 이유로 자동 검사하지 않는다. 센서 측정 데이터 수집·전기적 호환 확정·설정 변경은 이 MVP 기능이 아니다.
+센서 식별 읽기는 그때의 예상 주소·다른 I2C 작업 중지 확인과 유효한 로컬 운영 선언이 필요하다. 설치가 끝났다는 이유로 자동 검사하지 않는다. v0.2.0의 명시적인 sensor_check는 별도 일회성 로컬 계획 승인 후 짧은 센서 데이터와 조건부 SLEEP 해제·복원을 지원한다. 전기적 호환 확정·일반 설정 변경은 제공하지 않는다. [절차와 한계](v0.2.0-usage.md)를 따른다.
 
 ## 업데이트와 제거
 

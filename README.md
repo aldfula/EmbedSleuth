@@ -1,6 +1,6 @@
 # EmbedSleuth
 
-현재 공개 배포는 **v0.1.0**입니다. 저장소에서는 기존 프로젝트 적용과 승인된 센서 데이터 점검을 추가하는 **v0.2.0**을 개발 중입니다. 새 기능·제약·승인 절차는 [v0.2.0 안내](https://github.com/aldfula/EmbedSleuth/blob/main/docs/v0.2.0-usage.md)를 따릅니다. 아래 MVP 인수 기록은 v0.1.0의 검증 범위입니다.
+**v0.2.0**은 기존 프로젝트에 바로 적용하는 설치와, 사용자가 승인한 MPU6050 가속도·자이로·온도 점검을 제공합니다. 실제 Pi에서 센서 깨우기·5회 수집·절전 상태 복원을 확인했습니다. 새 기능·제약·승인 절차는 [v0.2.0 안내](https://github.com/aldfula/EmbedSleuth/blob/main/docs/v0.2.0-usage.md)를 따릅니다. 아래 MVP 인수 기록은 v0.1.0의 검증 범위입니다.
 
 데이터시트 근거와 실제 장치의 관측을 결합하는 임베디드 진단 AI 에이전트 패키지입니다. 첫 대상은 **Raspberry Pi 3와 MPU6050의 I2C 연결·인식 문제**입니다.
 
@@ -25,7 +25,16 @@ Linux 개발 PC의 Python 3.11 이상 전용 가상환경에서 [PyPI 패키지]
 pip install embedsleuth
 ```
 
-가상환경을 직접 관리하지 않으려면 `pipx install --python python3.12 embedsleuth`로 설치할 수도 있습니다. Linux/Python 3.12/pipx 1.19.1의 pip 백엔드에서 명령어·설정 생성·MCP·스킬·훅을 검증했습니다. 처음 설치하고 `embedsleuth-setup`으로 연결 자료를 준비하는 절차는 [새 PC 설치 안내](https://github.com/aldfula/EmbedSleuth/blob/main/docs/installation.md)를 따르세요. 저장소 복제는 필요하지 않습니다. SSH 대상 등록과 호스트의 훅 신뢰 검토는 운영자가 수행합니다. 같은 배포 파일을 [v0.1.0 GitHub Release](https://github.com/aldfula/EmbedSleuth/releases/tag/v0.1.0)에서도 제공합니다.
+가상환경을 직접 관리하지 않으려면 `pipx install --python python3.12 embedsleuth`로 설치할 수도 있습니다. Linux/Python 3.12/pipx 1.19.1의 pip 백엔드에서 명령어·설정 생성·MCP·스킬·훅을 검증했습니다. 처음 설치하고 `embedsleuth-setup`으로 연결 자료를 준비하는 절차는 [새 PC 설치 안내](https://github.com/aldfula/EmbedSleuth/blob/main/docs/installation.md)를 따르세요. 저장소 복제는 필요하지 않습니다. SSH 대상 등록과 호스트의 훅 신뢰 검토는 운영자가 수행합니다. 같은 배포 파일을 [v0.2.0 GitHub Release](https://github.com/aldfula/EmbedSleuth/releases/tag/v0.2.0)에서도 제공합니다.
+
+기존 프로젝트에서 연결 자료를 추가하려면 다음을 실행합니다. 기존 등록과 증거 경로를 그대로 사용하며 실행 후 AI 호스트의 MCP를 재연결합니다.
+
+```bash
+embedsleuth-setup --in-place --config /ABSOLUTE/PATH/targets.json --dry-run
+embedsleuth-setup --in-place --config /ABSOLUTE/PATH/targets.json
+```
+
+기존 pipx 설치는 `pipx upgrade embedsleuth`로 갱신합니다. 새 센서 기능의 검증 범위·승인 거절·복원 확인과 미검증 항목은 [v0.2.0 검증 기록](https://github.com/aldfula/EmbedSleuth/blob/main/docs/v0.2.0-verification.md)을 따릅니다.
 
 ## 현재 구현 상태
 
@@ -37,7 +46,7 @@ pip install embedsleuth
 - 세션·신선도·시간·호출·출력 제한, 동일 operation_id 결과 재사용
 - 소유자 전용 증거 저장, 원자적 보고서 갱신, 중단 복구와 대상 격리
 - 가짜 SSH·로컬 자식 프로세스·저장 실패를 이용한 오프라인 테스트
-- 아홉 진단 도구의 MCP 스키마·구조화 응답, 로컬 대상 설정, 취소·종료 처리
+- 센서 계획·수집을 포함한 11개 진단 도구의 MCP 스키마·구조화 응답, 로컬 대상 설정, 취소·종료 처리
 - diagnose-mpu6050 스킬, 실패 분기·근거 보고 지침, 20개 MCP 절차 재생 시험
 - 인자·저장 증거·보고서 훅, 진단 저장소의 읽기 전용 조회, 종료 보완 1회 제한
 - Pi 검사기의 자원 관측, 실제 STDIO MCP 인수 명령, 실제 모델 평가용 가짜 장치 환경
@@ -96,7 +105,7 @@ $diagnose-mpu6050로 등록된 lab-pi의 환경만 passive로 조사해 줘. 센
 
 신뢰된 로컬 코드가 `RegisteredTarget`에 호스트·계정·신뢰 파일·예상 버스와 주소를 등록한 뒤 `TargetRegistry`, `RunStore`, `ParamikoTransport`, `DiagnosticCore`를 조합합니다. AI가 받는 것은 `target_id`와 `run_id`이며 SSH 접속 정보는 도구 인자로 받지 않습니다. [코어 사용 예와 운영 조건](https://github.com/aldfula/EmbedSleuth/blob/main/docs/phase2-usage.md)을 참고하세요.
 
-Pi 3 Model B / Debian 12 / aarch64 / Python 3.11.2에서 주소 0x68의 WHO_AM_I=0x68 식별과 승인된 오류·복구·메모리 인수를 확인했습니다. 전체 에이전트 인수의 남은 조건은 현재 인수 기록을 따릅니다. 별도 승인된 계측 준비에서 부팅 파일 백업·memory cgroup 활성화·재부팅을 수행했으며, 진단 도구 자체는 설정을 변경하지 않습니다. 등록된 환경의 다른 I2C 사용자 배제는 별도 운영 조건이며 자동으로 증명되지 않습니다.
+Pi 3 Model B / Debian 12 / aarch64 / Python 3.11.2에서 주소 0x68의 WHO_AM_I=0x68 식별과 승인된 오류·복구·메모리 인수를 확인했습니다. 전체 에이전트 인수의 남은 조건은 현재 인수 기록을 따릅니다. 별도 승인된 계측 준비에서 부팅 파일 백업·memory cgroup 활성화·재부팅을 수행했으며, 기본 진단은 설정을 변경하지 않으며 sensor_check의 승인된 SLEEP 해제·복원만 예외입니다. 등록된 환경의 다른 I2C 사용자 배제는 별도 운영 조건이며 자동으로 증명되지 않습니다.
 
 ## 안전 원칙
 
@@ -105,7 +114,7 @@ Pi 3 Model B / Debian 12 / aarch64 / Python 3.11.2에서 주소 0x68의 WHO_AM_I
 - 전체 I2C 스캔, 임의 셸·레지스터 접근, 강제 드라이버 우회를 제공하지 않습니다.
 - 훅이 없어도 진단 코어의 정책이 적용되어야 합니다.
 - 설치·권한 변경·센서 초기화·재부팅은 MVP 검사 도구에 포함하지 않습니다.
-- 추후 변경 실행 기능은 대상과 구체적인 계획에 대한 사용자 승인을 요구합니다.
+- sensor_check의 조건부 SLEEP 해제·복원은 구체적인 일회성 계획을 운영자가 로컬 터미널에서 승인해야 합니다.
 
 프로필의 reviewed는 문서의 지정된 조건을 검토했다는 뜻입니다. 실제 Pi·모듈 호환성이나 하드웨어 정상 동작이 검증됐다는 뜻은 아닙니다. 식별값 일치도 정품·측정 정확도를 보장하지 않습니다.
 
@@ -123,6 +132,7 @@ Pi 3 Model B / Debian 12 / aarch64 / Python 3.11.2에서 주소 0x68의 WHO_AM_I
 - [Phase 6 인수 결과와 남은 조건](https://github.com/aldfula/EmbedSleuth/blob/main/docs/phase6-acceptance.md)
 - [새 PC에 Release 패키지 설치](https://github.com/aldfula/EmbedSleuth/blob/main/docs/installation.md)
 - [PyPI 게시·검증 기록](https://github.com/aldfula/EmbedSleuth/blob/main/docs/pypi-publishing.md)
+- [v0.2.0 릴리스 안내](https://github.com/aldfula/EmbedSleuth/blob/main/docs/release-v0.2.0.md)
 - [v0.1.0 릴리스 안내](https://github.com/aldfula/EmbedSleuth/blob/main/docs/release-v0.1.0.md)
 - [PC 배포·대상 등록·인수 명령](https://github.com/aldfula/EmbedSleuth/blob/main/docs/deployment.md)
 - [실제 모델 평가의 전송·허용 범위](https://github.com/aldfula/EmbedSleuth/blob/main/docs/model-evaluation-scope.md)

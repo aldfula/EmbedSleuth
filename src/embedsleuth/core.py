@@ -553,6 +553,13 @@ class DiagnosticCore(SamplingMixin):
             try:
                 saved = DiagnosticReport.model_validate_json(json.dumps(self.store.load_report(run_id)))
                 hypotheses = saved.hypotheses
+                # A finalized snapshot records the rules used at completion.
+                # Reading it after a profile/software upgrade must not silently
+                # re-evaluate or overwrite that historical decision. Recovery
+                # above still takes precedence over an interrupted operation.
+                if (state["state"] == "reported"
+                        and json.loads(saved.model_dump_json())["evidence"] == state["evidence"]):
+                    return saved
             except FileNotFoundError:
                 # State may be committed even if the first report write failed.
                 hypotheses = ()

@@ -1,4 +1,4 @@
-# Release v0.1.0 runtime versions verified on Linux x86_64 / Python 3.12.14.
+# Release v0.2.0 runtime versions on Linux x86_64 / Python 3.12.14.
 # Constraints are applied when installing the GitHub Release wheel.
 annotated-types==0.8.0
 pydantic==2.14.3
