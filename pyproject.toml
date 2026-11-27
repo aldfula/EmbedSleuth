@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "embedsleuth"
-version = "0.1.0"
+version = "0.2.0"
 description = "Evidence-based embedded diagnostics for AI hosts via MCP"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -14,6 +14,7 @@ dependencies = ["pydantic>=2.10,<3", "paramiko>=3.4,<5", "mcp>=2.3,<3", "anyio>=
 embedsleuth-mcp = "embedsleuth.mcp_server:main"
 embedsleuth-hook = "embedsleuth.hooks:main"
 embedsleuth-setup = "embedsleuth.workspace:main"
+embedsleuth-approve-sampling = "embedsleuth.sampling_approval:main"
 
 [project.optional-dependencies]
 dev = ["pytest>=8,<10", "PyYAML>=6,<7"]

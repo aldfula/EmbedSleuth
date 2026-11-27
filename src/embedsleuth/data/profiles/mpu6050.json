@@ -1,13 +1,13 @@
 {
   "schema_version": "1.0",
   "profile_id": "mpu6050",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "manufacturer": "InvenSense",
   "component": "MPU-6050",
   "scope": "ic",
   "review_status": "reviewed",
-  "reviewed_on": "2026-11-17",
-  "review_notes": "Document review of identity, address, VDD and bus constraints only; not hardware qualification. Manufacturer-authored public distribution copies were downloaded, document numbers/revisions and cited sections inspected, and original bytes hashed. Single-byte combined register read is described in PS section 9.3, page 35. WHO_AM_I is read-only, not a FIFO or read-to-clear interrupt register. Module circuit and VLOGIC conditions remain deployment-specific.",
+  "reviewed_on": "2026-11-27",
+  "review_notes": "Document review of identity, address, VDD and bus constraints only; not hardware qualification. Manufacturer-authored public distribution copies were downloaded, document numbers/revisions and cited sections inspected, and original bytes hashed. Single-byte combined register read is described in PS section 9.3, page 35. WHO_AM_I is read-only, not a FIFO or read-to-clear interrupt register. Module circuit and VLOGIC conditions remain deployment-specific. The 2026-11-27 extension also reviews RM 4.4, 4.5, 4.17-4.19 and 4.28-4.29 for fixed burst snapshots, current-range conversion and conditional SLEEP-bit clearing/restoration. Reads can acknowledge configured interrupts; explicit local plan approval is required for the entire sampling procedure. This is document review, not calibration or physical acceptance.",
   "sources": [
     {
       "source_id": "mpu-register-map",
@@ -30,8 +30,15 @@
       "sha256": "a4fdf69590b8cbab1cf0a5bcd359327b0ac022061fb233855aff2e191e7e3584"
     }
   ],
-  "addresses": [104, 105],
-  "address_citation": {"source_id": "mpu-product-spec", "section": "6.4", "page": 15},
+  "addresses": [
+    104,
+    105
+  ],
+  "address_citation": {
+    "source_id": "mpu-product-spec",
+    "section": "6.4",
+    "page": 15
+  },
   "identity": {
     "register_address": 117,
     "length": 1,
@@ -39,19 +46,77 @@
     "mask": 255,
     "access": "read_only",
     "read_side_effect": "register_pointer_only",
-    "citation": {"source_id": "mpu-register-map", "section": "4.32", "page": 45}
+    "citation": {
+      "source_id": "mpu-register-map",
+      "section": "4.32",
+      "page": 45
+    }
   },
   "supply": {
     "minimum_v": 2.375,
     "maximum_v": 3.46,
-    "citation": {"source_id": "mpu-product-spec", "section": "6.3", "page": 14}
+    "citation": {
+      "source_id": "mpu-product-spec",
+      "section": "6.3",
+      "page": 14
+    }
   },
   "max_i2c_hz": 400000,
-  "bus_citation": {"source_id": "mpu-product-spec", "section": "6.4", "page": 15},
+  "bus_citation": {
+    "source_id": "mpu-product-spec",
+    "section": "6.4",
+    "page": 15
+  },
   "limitations": [
     "IC-level profile; breakout-board regulator, pull-ups, VLOGIC wiring and electrical compatibility are not inferred.",
     "Identity match does not establish authenticity, measurement accuracy or healthy wiring.",
     "Address and register-pointer selection involve bus writes within the approved read transaction; no configuration-register writes are authorized.",
     "Unknown devices at the same address and concurrent bus users require deployment checks before a probe."
-  ]
+  ],
+  "sampling": {
+    "review_status": "reviewed",
+    "reviewed_on": "2026-11-27",
+    "data_register": 59,
+    "length": 14,
+    "count": 5,
+    "power_register": 107,
+    "wake_clear_mask": 64,
+    "citations": [
+      {
+        "source_id": "mpu-register-map",
+        "section": "4.4",
+        "page": 14
+      },
+      {
+        "source_id": "mpu-register-map",
+        "section": "4.5",
+        "page": 15
+      },
+      {
+        "source_id": "mpu-register-map",
+        "section": "4.17",
+        "page": 29
+      },
+      {
+        "source_id": "mpu-register-map",
+        "section": "4.18",
+        "page": 30
+      },
+      {
+        "source_id": "mpu-register-map",
+        "section": "4.19",
+        "page": 31
+      },
+      {
+        "source_id": "mpu-register-map",
+        "section": "4.28",
+        "page": 40
+      },
+      {
+        "source_id": "mpu-register-map",
+        "section": "4.29",
+        "page": 42
+      }
+    ]
+  }
 }

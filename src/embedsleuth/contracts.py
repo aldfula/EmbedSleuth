@@ -15,11 +15,11 @@ ReportText = Annotated[str, StringConstraints(strip_whitespace=True, min_length=
 Version = Annotated[str, Field(pattern=r"^\d+\.\d+\.\d+$")]
 Byte = Annotated[int, Field(ge=0, le=255)]
 I2CAddress = Annotated[int, Field(ge=0x08, le=0x77)]
-Mode = Literal["read_only", "passive"]
+Mode = Literal["read_only", "passive", "sensor_check"]
 Assessment = Literal["pass", "fail", "unknown", "not_applicable"]
 ToolStatus = Literal["ok", "error", "blocked", "unsupported", "timeout"]
 RunState = Literal[
-    "created", "connected", "inspected", "probe_ready", "identified", "reported",
+    "created", "connected", "inspected", "probe_ready", "identified", "sampling_planned", "sampled", "reported",
     "blocked", "expired", "cancelled",
 ]
 ErrorCode = Literal[
@@ -52,6 +52,16 @@ class StartDiagnosisRequest(Contract):
 class IdentityReadRequest(RunRequest):
     bus_ref: Identifier
     address: I2CAddress
+    operation_id: Identifier
+
+
+class SamplingPlanRequest(RunRequest):
+    bus_ref: Identifier
+    address: I2CAddress
+
+
+class SamplingRequest(RunRequest):
+    plan_id: Identifier
     operation_id: Identifier
 
 

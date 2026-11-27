@@ -30,6 +30,7 @@ from embedsleuth.storage import RunStore, StorageError, StoreBusyError, sanitize
 from embedsleuth.targets import TargetRegistry
 from embedsleuth.tools import validate_arguments
 from embedsleuth.transport import ProbeResponse
+from embedsleuth.sampling import SamplingMixin
 
 
 class SessionError(ValueError):
@@ -38,7 +39,7 @@ class SessionError(ValueError):
         super().__init__(message)
 
 
-class DiagnosticCore:
+class DiagnosticCore(SamplingMixin):
     def __init__(
         self, registry: TargetRegistry, transport, store: RunStore, *,
         clock: Callable[[], float] = time.monotonic,
@@ -71,6 +72,10 @@ class DiagnosticCore:
             return self.start_diagnosis(request.target_id, request.profile_id, request.mode)
         if tool_name == "read_device_identity":
             return self.read_device_identity(request.run_id, request.bus_ref, request.address, request.operation_id)
+        if tool_name == "prepare_sensor_sampling":
+            return self.prepare_sensor_sampling(request.run_id, request.bus_ref, request.address)
+        if tool_name == "sample_sensor_data":
+            return self.sample_sensor_data(request.run_id, request.plan_id, request.operation_id)
         if tool_name == "finalize_report":
             return self.finalize_report(request.run_id, request.hypotheses)
         return getattr(self, tool_name)(request.run_id)
@@ -192,7 +197,7 @@ class DiagnosticCore:
         )
         record = EvidenceRecord(evidence_id=evidence_id, result=result)
         state["evidence"].append(json.loads(record.model_dump_json(warnings="error")))
-        if pending and pending["tool"] == "read_device_identity":
+        if pending and pending["tool"] in ("read_device_identity", "sample_sensor_data"):
             state["operations"][operation_id] = {
                 "arguments": pending["arguments"], "result": json.loads(result.model_dump_json()),
             }
@@ -231,6 +236,8 @@ class DiagnosticCore:
             state["pending_operation"]["arguments"] = {
                 "bus_ref": "bus-" + str(request["bus"]), "address": request["address"],
             }
+        elif operation == "sample_sensor_data":
+            state["pending_operation"]["arguments"] = {"tool": operation, "plan_id": request["plan_id"]}
         self.store.save_state(state["run_id"], state)
         # Durable intent may itself take time. Never dispatch using the budget
         # or freshness snapshot from before its fsyncs.
@@ -239,15 +246,23 @@ class DiagnosticCore:
         timeout = min(self.tool_timeout - (now - started), self.active_budget - elapsed,
                       self.run_ttl - elapsed)
         expired = elapsed < 0 or elapsed >= self.run_ttl
-        stale = (operation == "read_device_identity" and
+        stale = (operation in ("read_device_identity", "sample_sensor_data") and
                  not 0 <= now - state.get("environment_at", float("-inf")) < self.freshness)
-        if expired or timeout <= 0 or stale:
+        sampling_budget_missing = operation == "sample_sensor_data" and timeout < 9.0
+        sampling_approval_missing = False
+        if operation == "sample_sensor_data":
+            from embedsleuth.sampling import valid_plan, plan_identifier
+            saved = state.get("sampling_plan") or {}
+            sampling_approval_missing = (saved.get("approved") is not True or saved.get("consumed") is not True
+                or not valid_plan(saved.get("plan", {}), self.utcnow())
+                or plan_identifier(saved.get("plan", {})) != request["plan_id"])
+        if expired or timeout <= 0 or stale or sampling_budget_missing or sampling_approval_missing:
             state["remote_state"] = "idle"  # No transport call has occurred.
             state["state"] = "expired" if expired else "blocked"
             state["environment"] = None
             state["pending_operation"]["duration_ms"] = max(0, int((now - started) * 1000))
             return ProbeResponse(
-                status="blocked", error_code=("run_expired" if expired else "policy_denied" if stale else "resource_limit"),
+                status="blocked", error_code=("run_expired" if expired else "policy_denied" if stale or sampling_approval_missing else "resource_limit"),
                 message="Diagnostic deadline or environment freshness expired before dispatch",
             )
         try:
@@ -430,7 +445,10 @@ class DiagnosticCore:
     def _findings(self, state: dict) -> tuple[Finding, ...]:
         records = [EvidenceRecord.model_validate_json(json.dumps(record)) for record in state["evidence"]]
         findings = []
-        identity_executions = {operation["result"]["execution_id"] for operation in state["operations"].values()}
+        identity_executions = {operation["result"]["execution_id"] for operation in state["operations"].values()
+                               if "bus_ref" in operation["arguments"]}
+        sampling_executions = {operation["result"]["execution_id"] for operation in state["operations"].values()
+                               if operation["arguments"].get("tool") == "sample_sensor_data"}
         for record in records:
             result = record.result
             if (result.execution_id in identity_executions and "identity_value" in result.observations
@@ -447,6 +465,9 @@ class DiagnosticCore:
                     "unknown": "Identity could not be classified from the available observation.",
                 }[assessment]
                 rule_id = "identity-match"
+            elif result.execution_id in sampling_executions and result.status == "ok":
+                assessment, rule_id = "pass", "sensor-data-acquisition"
+                explanation = "Bounded sensor snapshots were acquired and configuration restoration was confirmed; health and accuracy remain unknown."
             elif result.error:
                 assessment, rule_id = "unknown", result.error.code
                 explanation = "Inspection was unavailable or blocked: " + result.error.code + ". No sensor-failure conclusion."
@@ -483,6 +504,13 @@ class DiagnosticCore:
             if any(record.evidence_id in f.evidence_ids for f in current_findings)
         }
         coverage_complete = has_identity or set(state["expected_addresses"]).issubset(attempted_addresses)
+        if state["mode"] == "sensor_check":
+            coverage_complete = coverage_complete and any(
+                finding.rule_id == "sensor-data-acquisition" and finding.assessment == "pass"
+                and any(record.evidence_id in finding.evidence_ids
+                        and self._same_binding(state, record.result.observations)
+                        and record.result.observations.get("adapter_fingerprint") == environment.get("adapter_fingerprint")
+                        for record in records) for finding in findings)
         outcome = ("interrupted" if state["state"] in ("cancelled", "expired")
                    or state["remote_state"] == "unknown" else "partial")
         if (outcome != "interrupted" and coverage_complete
@@ -495,6 +523,7 @@ class DiagnosticCore:
                 "Electrical voltages, pull-ups and physical wiring were not measured.",
                 "Identity response does not prove authenticity, measurement accuracy or full sensor health.",
                 "Only the registered adapter and expected addresses were inspected; no whole-bus scan was performed.",
+                "Short sensor snapshots do not establish calibration, independent sample updates or whole-device health.",
             ), next_actions=("Review the observed facts and unresolved conditions before changing the system.",),
         )
         return report

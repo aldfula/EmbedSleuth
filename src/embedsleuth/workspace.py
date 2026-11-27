@@ -1,7 +1,8 @@
-"""Prepare a new local workspace from installed resources; never grant trust.
+"""Prepare local workspace resources; never grant trust.
 
 No SSH, model, installation, shell execution or diagnostic-state recovery.
-Existing registrations are read without modification; workspaces are exclusive.
+New workspaces are exclusive. --in-place conservatively merges existing projects.
+Existing registrations and diagnostic evidence are preserved.
 """
 
 import argparse
@@ -123,13 +124,23 @@ def prepare(directory, config_path, *, init_config=False, state_directory=None):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--directory", required=True, type=Path)
+    parser.add_argument("--directory", type=Path)
     parser.add_argument("--config", required=True, type=Path)
     parser.add_argument("--init-config", action="store_true")
     parser.add_argument("--state-directory", type=Path)
+    parser.add_argument("--in-place", action="store_true", help="Merge into an existing workspace (default: current directory)")
+    parser.add_argument("--dry-run", action="store_true", help="List in-place changes without writing files")
     args = parser.parse_args()
     try:
-        result = prepare(args.directory, args.config, init_config=args.init_config, state_directory=args.state_directory)
+        if args.in_place:
+            from embedsleuth.workspace_merge import apply_existing
+            directory = (args.directory or Path.cwd()).absolute()
+            result = apply_existing(directory, args.config, dry_run=args.dry_run,
+                                    init_config=args.init_config, state_directory=args.state_directory)
+        else:
+            if args.directory is None or args.dry_run:
+                raise ValueError("New workspace setup requires --directory; --dry-run requires --in-place")
+            result = prepare(args.directory, args.config, init_config=args.init_config, state_directory=args.state_directory)
     except ValueError as exc:
         parser.exit(2, f"Setup stopped: {exc}. No trust granted.\n")
     except OSError:

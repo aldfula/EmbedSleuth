@@ -60,6 +60,17 @@ class SupplyRange(Contract):
         return self
 
 
+class SamplingRule(Contract):
+    review_status: Literal["draft", "reviewed"] = "draft"
+    reviewed_on: date | None = None
+    data_register: Literal[59] = 59
+    length: Literal[14] = 14
+    count: Literal[5] = 5
+    power_register: Literal[107] = 107
+    wake_clear_mask: Literal[64] = 64
+    citations: Annotated[tuple[Citation, ...], Field(min_length=1)]
+
+
 class ComponentProfile(Contract):
     schema_version: Literal["1.0"] = "1.0"
     profile_id: Identifier
@@ -77,6 +88,7 @@ class ComponentProfile(Contract):
     supply: SupplyRange
     max_i2c_hz: Annotated[int, Field(gt=0)]
     bus_citation: Citation
+    sampling: SamplingRule | None = None
     limitations: Annotated[tuple[str, ...], Field(min_length=1)]
 
     @model_validator(mode="after")
@@ -88,9 +100,15 @@ class ComponentProfile(Contract):
             raise ValueError("duplicate I2C address")
         for citation in (
             self.address_citation, self.identity.citation, self.supply.citation, self.bus_citation,
+            *(self.sampling.citations if self.sampling else ()),
         ):
             if citation.source_id not in source_ids:
                 raise ValueError("citation refers to an unknown document")
+        if self.sampling and self.sampling.review_status == "reviewed" and (
+            self.sampling.reviewed_on is None or (self.review_status == "reviewed" and (
+                self.reviewed_on is None or self.sampling.reviewed_on > self.reviewed_on))
+        ):
+            raise ValueError("sampling review requires a date within the profile review")
         if self.review_status == "reviewed" and self.reviewed_on is None:
             raise ValueError("reviewed profile requires a review date")
         if self.reviewed_on is not None and any(

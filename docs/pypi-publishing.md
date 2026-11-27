@@ -1,5 +1,11 @@
 # PyPI 게시 절차
 
+## v0.2.0 준비 상태
+
+게시 워크플로는 새 v0.2.0 GitHub Release와 별도 `release-manifests/v0.2.0.json`을 검증하도록 준비했다. 아직 그 Release/매니페스트를 게시하거나 워크플로를 실행하지 않았다. 실물 인수 후 소스 커밋·최종 배포 파일·해시를 고정하고 검증 전용 실행부터 진행한다. 기존 v0.1.0 태그·파일·매니페스트는 보존한다. 아래 v0.1.0 기록은 이미 완료한 게시의 근거다.
+
+기존 Trusted Publisher의 저장소·워크플로 파일명·`pypi` environment를 계속 사용하며 새 권한을 부여하지 않는다. 게시 작업에만 OIDC 권한을 주는 경계와 기본 `publish=false`는 유지한다.
+
 2026-11-27에 기존 GitHub Release의 v0.1.0 wheel·sdist를 [PyPI](https://pypi.org/project/embedsleuth/0.1.0/)에 게시했다. 공개 인덱스에서 패키지 이름으로 설치하고 MCP·스킬·훅 검증까지 통과했다. Linux 개발 PC의 전용 가상환경에서 `pip install embedsleuth`로 설치할 수 있다.
 
 ## 게시 파일과 경계
@@ -55,6 +61,7 @@ gh workflow run pypi-publish.yml --repo aldfula/EmbedSleuth --ref main -f publis
 - 공개 PyPI JSON의 이름·버전·파일 두 개·SHA-256이 매니페스트와 일치하고 yanked 상태가 아님을 확인했다. GitHub Release와 같은 바이트다.
 - 저장소 밖의 새 Linux/Python 3.12.14 가상환경에서 `pip --isolated install --index-url https://pypi.org/simple embedsleuth==0.1.0` 성공. 런타임 제약 파일을 사용하지 않았다. 설치 보고서의 wheel 출처는 `files.pythonhosted.org`이고 SHA-256도 일치했다. 선택된 주요 의존성은 Pydantic 2.14.4, Paramiko 4.0.0, MCP 2.3.0, AnyIO 4.16.0이다.
 - `pip check`와 실제 `scripts/check_release_install.py` 성공: 스킬 자료·새 작업 폴더·생산 MCP 도구 9개·Pre/Post/Stop 훅 3개. 등록 대상 0개·장치 검사 0회·모델 0턴·훅 신뢰 부여 없음.
+- pipx 추가 인수도 통과했다(Linux/Python 3.12.14, pipx 1.19.1, pip 백엔드). 공개 PyPI에서 버전 미지정 `embedsleuth` 설치로 0.1.0과 동일 wheel 해시를 확인했다. 임시 PIPX_HOME/BIN 경로를 사용하고 가상환경을 활성화하지 않은 상태에서 앱 3개 실행·실제 setup·pipx Python의 MCP 설정·의존성·기존 설치 검사 전체를 검증했다. `pipx uninstall embedsleuth` 후 앱/가상환경 제거와 새 작업 폴더/등록/증거 파일의 해시 보존을 확인했다. 운영 설정·전역 pipx 설치·사용자 셸 설정을 변경하지 않았다. [pipx 설치 안내](installation.md#pipx로-설치)
 - 기존 배포 파일을 보존했으므로 PyPI v0.1.0 설명은 GitHub 설치를 안내하던 README다. 설명 본문의 상대 문서 링크는 PyPI에서 열리지 않으며 Metadata의 Documentation 링크 또는 [최신 설치 문서](https://github.com/aldfula/EmbedSleuth/blob/main/docs/installation.md)를 사용한다. 이 문서 한계 때문에 이미 게시된 파일을 바꾸거나 재업로드하지 않는다.
 
 근거: [PyPI Pending Publisher](https://docs.pypi.org/trusted-publishers/creating-a-project-through-oidc/), [Trusted Publisher 설정](https://docs.pypi.org/trusted-publishers/adding-a-publisher/), [공식 PyPI 게시 Action](https://github.com/pypa/gh-action-pypi-publish).

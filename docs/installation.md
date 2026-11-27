@@ -4,7 +4,38 @@
 
 배포 위치: [PyPI v0.1.0](https://pypi.org/project/embedsleuth/0.1.0/)과 동일 파일의 [GitHub Release](https://github.com/aldfula/EmbedSleuth/releases/tag/v0.1.0). 인터넷으로 패키지와 의존성을 내려받는다. AI 호스트의 설치·로그인·사용 한도는 별도이며 EmbedSleuth는 API 키나 LLM 클라이언트를 만들지 않는다.
 
-## 1. PC 전용 가상환경에 설치
+## 1. PC에 설치
+
+pipx와 직접 가상환경을 만드는 방법 중 하나를 선택한다.
+
+### pipx로 설치
+
+pipx와 Python 3.12가 준비되어 있다면 다음과 같이 설치한다. pipx 자체의 설치는 [공식 설치 안내](https://pipx.pypa.io/stable/how-to/install-pipx.html)를 따른다.
+
+```bash
+pipx install --python python3.12 embedsleuth==0.1.0
+embedsleuth-setup --help
+```
+
+pipx의 기본 Python이 3.11 이상이면 `pipx install embedsleuth`도 사용할 수 있다. pipx가 앱별 가상환경을 관리하므로 사용 시 직접 활성화하지 않는다. 설치가 끝나면 `embedsleuth-setup`, `embedsleuth-mcp`, `embedsleuth-hook` 명령을 제공한다. 명령을 찾지 못하면 `pipx ensurepath` 후 새 터미널에서 다시 확인한다. 이 명령은 셸의 PATH 설정을 갱신한다.
+
+2026-11-27에 Linux/Python 3.12.14/pipx 1.19.1의 pip 백엔드로 공개 PyPI의 `embedsleuth`를 설치했다. 배포본 SHA-256 일치, 세 명령어의 PATH 실행, 실제 setup 명령의 새 작업 폴더 생성, 생성 설정이 pipx Python을 사용하는 것, 의존성, 생산 MCP 9개 도구, 스킬, 훅 3개를 확인했다. 시험은 임시 PIPX_HOME·명령 경로에서 가상환경 활성화 없이 수행했다. 사용자 셸 설정·운영 설정·실제 Pi·모델은 사용하지 않았다. 다른 pipx 버전이나 uv 백엔드 실행 검증으로 확대 해석하지 않는다.
+
+pipx 설치 후 **새 PC의 새 등록**을 준비하는 예다. 아래 경로가 아직 없어야 한다.
+
+```bash
+embedsleuth-setup \
+  --directory "$HOME/embedsleuth-workspace" \
+  --config "$HOME/.config/embedsleuth/targets.json" \
+  --init-config \
+  --state-directory "$HOME/.embedsleuth-state"
+```
+
+기존 등록·증거가 있다면 `--init-config`와 `--state-directory`를 생략하고 기존 `--config`를 연결한다. 자세한 조건은 2절을 따른다. 이미 작업 폴더를 생성했다면 3절로 진행한다.
+
+pipx 제거 시험에서 앱과 전용 가상환경은 제거되고 새 작업 폴더·대상 등록·증거 저장소의 파일 해시는 유지됐다. 제거하면 생성된 MCP·훅의 Python 경로는 사용할 수 없으므로, 호스트 연결을 먼저 해제하고 재설치·업데이트 시에는 기존 등록과 증거를 보존해 연결을 다시 검토한다.
+
+### 직접 가상환경을 만들어 설치
 
 Python 3.12와 venv를 준비한다. 아래 전용 가상환경 경로가 아직 없는 새 설치 기준이다. 시스템 Python에 sudo로 설치하지 않는다.
 
@@ -35,7 +66,7 @@ sha256sum --ignore-missing -c SHA256SUMS
 
 wheel과 constraints-runtime.txt 두 줄 모두 OK인지 확인한다. 출처·해시가 다르면 설치하지 않는다.
 
-위에서 준비한 전용 가상환경에 내려받은 wheel을 설치할 수도 있다. 런타임 버전을 고정해 기존 Release의 의존성을 재현하려면 내려받은 폴더에서 실행한다.
+직접 만든 전용 가상환경에 내려받은 wheel을 설치할 수도 있다. 런타임 버전을 고정해 기존 Release의 의존성을 재현하려면 내려받은 폴더에서 실행한다.
 
 ```bash
 "$HOME/.local/share/embedsleuth/venv/bin/python" -I -m pip install \

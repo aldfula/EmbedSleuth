@@ -6,7 +6,7 @@ from typing import Any, Mapping
 
 from embedsleuth.contracts import (
     Contract, FinalizeReportRequest, IdentityReadRequest, ProfileRequest,
-    RunRequest, StartDiagnosisRequest,
+    RunRequest, StartDiagnosisRequest, SamplingPlanRequest, SamplingRequest,
 )
 
 TOOL_REQUEST_MODELS: Mapping[str, type[Contract]] = MappingProxyType({
@@ -15,6 +15,8 @@ TOOL_REQUEST_MODELS: Mapping[str, type[Contract]] = MappingProxyType({
     "inspect_target": RunRequest,
     "inspect_i2c_environment": RunRequest,
     "read_device_identity": IdentityReadRequest,
+    "prepare_sensor_sampling": SamplingPlanRequest,
+    "sample_sensor_data": SamplingRequest,
     "evaluate_findings": RunRequest,
     "finalize_report": FinalizeReportRequest,
     "get_report": RunRequest,

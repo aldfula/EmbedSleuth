@@ -59,8 +59,11 @@ def test_skill_references_are_local_discoverable_and_do_not_escape_package():
 
 def test_documented_tool_examples_validate_against_live_strict_input_schemas():
     text = (SKILL / "references/tool-contracts.md").read_text()
-    block, = re.findall(r"```json\n(.*?)\n```", text, re.S)
-    examples = json.loads(block.replace("$run_id", "run-example").replace("$evidence_id", "ev-example"))
+    examples = []
+    for block in re.findall(r"```json\n(.*?)\n```", text, re.S):
+        parsed = json.loads(block.replace("$run_id", "run-example").replace("$evidence_id", "ev-example")
+                            .replace("$plan_id", "plan-example"))
+        examples.extend(parsed if isinstance(parsed, list) else [parsed])
     assert {item["tool"] for item in examples} == set(tool_input_schemas())
     for item in examples:
         request = validate_arguments(item["tool"], item["arguments"])

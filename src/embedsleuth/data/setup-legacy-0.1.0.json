@@ -1,0 +1,9 @@
+{
+  "source_wheel_sha256": "8b5c38899988bbc6e5c74b40603c18e3613d4e18399ced5c71f303ba126acb88",
+  "files": {
+    ".agents/skills/diagnose-mpu6050/SKILL.md": "2c87053c02fc4d63267c66ceeaf326d5479ff6ea6c98e4f3af4ed8d914770490",
+    ".agents/skills/diagnose-mpu6050/agents/openai.yaml": "69be66f1cb8d6793bc176aaeeaf0a685499b579b876bbb0e222af5b67c9e394e",
+    ".agents/skills/diagnose-mpu6050/references/tool-contracts.md": "01d81df4c77e29e1f9e80f1fc239a1b4be542d2812bbcbbcbc9fb6f7c2cf58e4",
+    ".agents/skills/diagnose-mpu6050/references/failure-paths.md": "aeb71d398e8ba00561812c604f15952d1da7d59b90daa562f478b2bf16627265"
+  }
+}

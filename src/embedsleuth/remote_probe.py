@@ -1,7 +1,8 @@
 """Standalone, stdlib-only Pi probe. Source is executed by SSH, never installed.
 
 No caller-supplied command, path, register, transfer length or process flag is
-accepted. Inspection does not perform I2C transfers. Only identity does so.
+accepted. Inspection does not perform I2C transfers. Sensor sampling is a
+separate fixed procedure, admitted only after local approval in the PC core.
 """
 
 import array
@@ -36,6 +37,7 @@ def validate_request(request):
     fields = {"inspect_target": {"op"},
               "inspect_i2c_environment": {"op", "bus", "addresses"},
               "read_device_identity": {"op", "bus", "addresses", "address", "expected_boot_id", "expected_adapter_fingerprint"}}
+    fields["sample_sensor_data"] = fields["read_device_identity"] | {"plan_id"}
     if op not in fields or set(request) != fields[op]:
         raise ValueError("unsupported operation or fields")
     if op == "inspect_target":
@@ -47,13 +49,16 @@ def validate_request(request):
         raise ValueError("invalid addresses")
     if any(type(a) is not int or a not in (104, 105) for a in addresses) or len(set(addresses)) != len(addresses):
         raise ValueError("invalid addresses")
-    if op == "read_device_identity":
+    if op in ("read_device_identity", "sample_sensor_data"):
         if type(request["address"]) is not int or request["address"] not in addresses:
             raise ValueError("unexpected identity address")
         for field in ("expected_boot_id", "expected_adapter_fingerprint"):
             value = request[field]
             if type(value) is not str or not value or len(value) > 128:
                 raise ValueError("invalid precondition fingerprint")
+    if op == "sample_sensor_data" and (type(request["plan_id"]) is not str
+            or re.fullmatch(r"sampling-[0-9a-f]{64}", request["plan_id"]) is None):
+        raise ValueError("invalid sampling plan reference")
     return request
 
 
@@ -247,12 +252,164 @@ def read_device_identity(request):
     return response(observations=environment)
 
 
+class SamplingFailure(Exception):
+    def __init__(self, code, message, unknown=False):
+        self.code, self.message, self.unknown = code, message, unknown
+        super().__init__(message)
+
+
+def sensor_transfer(command, timeout):
+    """One fixed transaction. Timeout never establishes kernel IO completion."""
+    if timeout <= 0:
+        raise SamplingFailure("resource_limit", "Sampling time budget exhausted")
+    process = subprocess.Popen(command, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                               env={"PATH": "/usr/sbin:/usr/bin:/sbin:/bin", "LC_ALL": "C"}, start_new_session=True)
+    try:
+        output, _ = communicate_bounded(process, timeout=min(timeout, 0.45))
+    except BaseException:
+        stop_transfer(process)
+        raise SamplingFailure("remote_state_unknown", "Transfer completion is unknown; no further bus access", True) from None
+    finally:
+        for pipe in (process.stdout, process.stderr):
+            if pipe is not None:
+                pipe.close()
+    if process.returncode:
+        raise SamplingFailure("transfer_failed", "Fixed sampling transaction failed")
+    return output
+
+
+def sample_sensor_data(request):
+    """At most five snapshots; only SLEEP can be changed, then restored.
+
+    The trusted PC core, not this wire request, owns local approval validation.
+    Unknown transfer completion forbids even a restoration attempt: a second
+    transfer must not race a possibly stuck first one. Report and quarantine.
+    """
+    environment = collect_environment(request["bus"], request["addresses"])
+    if (environment.get("boot_id") != request["expected_boot_id"]
+            or environment.get("adapter_fingerprint") != request["expected_adapter_fingerprint"]
+            or not environment.get("adapter_present") or environment.get("access_allowed") is not True
+            or environment.get("driver_bound", {}).get(str(request["address"])) is not False
+            or environment.get("combined_transfer_supported") is not True):
+        return response("blocked", "policy_denied", "Sampling prerequisites changed", environment)
+    executable = find_i2ctransfer()
+    if executable is None:
+        return response("unsupported", "dependency_missing", "Trusted i2ctransfer unavailable", environment)
+    address = "0x%02x" % request["address"]
+    prefix = [executable, "-y", str(request["bus"])]
+    started = time.monotonic()
+    work_deadline, restoration_deadline = started + 5.5, started + 7.5
+    environment.update({"address": request["address"], "plan_id": request["plan_id"], "samples": [],
+                        "wakeup_attempted": False, "restoration_confirmed": True})
+    original = None
+    failure = None
+    uncertain = False
+    handlers = {}
+
+    def read(register, length, deadline):
+        # Only literals below call this helper; no model-supplied register.
+        output = sensor_transfer(prefix + ["w1@" + address, "0x%02x" % register, "r%d" % length],
+                                 deadline - time.monotonic())
+        tokens = output.split()
+        if len(tokens) != length or any(re.fullmatch(b"0x[0-9a-fA-F]{2}", token) is None for token in tokens):
+            raise SamplingFailure("transfer_failed", "Malformed fixed sampling response")
+        return [int(token[2:], 16) for token in tokens]
+
+    def write_power(value, deadline):
+        output = sensor_transfer(prefix + ["w2@" + address, "0x6b", "0x%02x" % value],
+                                 deadline - time.monotonic())
+        if output.strip():
+            raise SamplingFailure("transfer_failed", "Unexpected power-write response")
+
+    def interrupted(signum, frame):
+        raise SamplingFailure("policy_denied", "Sampling interrupted; reviewing restoration")
+
+    try:
+        # Signals between transactions enter restoration. Signals during IO are
+        # uncertain and cannot justify starting another bus transaction.
+        for signum in (signal.SIGHUP, signal.SIGTERM, signal.SIGINT):
+            handlers[signum] = signal.signal(signum, interrupted)
+        if read(0x75, 1, work_deadline) != [104]:
+            raise SamplingFailure("identity_mismatch", "Identity changed before sampling")
+        divider, configuration, gyro, accel = read(0x19, 4, work_deadline)
+        interrupt_pin, interrupt_enable = read(0x37, 2, work_deadline)
+        control, power, power2 = read(0x6a, 3, work_deadline)
+        environment["configuration"] = {"sample_rate_divider": divider, "config": configuration,
+                                         "gyro_config": gyro, "accel_config": accel,
+                                         "user_ctrl": control, "pwr_mgmt_1": power, "pwr_mgmt_2": power2}
+        if (gyro & 0xe7 or accel & 0xe7 or configuration & 0xc0 or configuration & 7 == 7
+                or interrupt_pin & 0x10 or interrupt_enable != 0 or control != 0 or power2 != 0
+                or power & 0xb8 or power & 7 > 3):
+            raise SamplingFailure("policy_denied", "Unsupported self-test, interrupt, clock, standby, FIFO/DMP or power configuration")
+        original = power
+        active = power & ~0x40
+        if power != active:
+            # Mark before dispatch so a failed/unknown write cannot be hidden.
+            environment["wakeup_attempted"] = True
+            environment["restoration_confirmed"] = False
+            write_power(active, work_deadline)
+            if read(0x6b, 1, work_deadline) != [active]:
+                raise SamplingFailure("state_changed", "Wake state did not match the approved bit change")
+            time.sleep(0.1)
+        for index in range(5):
+            if index:
+                time.sleep(0.05)
+            environment["samples"].append(read(0x3b, 14, work_deadline))
+        # Recheck relevant configuration instead of silently decoding a moving range.
+        if (read(0x19, 4, work_deadline) != [divider, configuration, gyro, accel]
+                or read(0x6a, 3, work_deadline) != [control, active, power2]):
+            raise SamplingFailure("state_changed", "Sensor configuration changed during sampling")
+    except SamplingFailure as exc:
+        failure, uncertain = exc, exc.unknown
+    except BaseException:
+        failure = SamplingFailure("remote_state_unknown", "Sampling completion could not be established", True)
+        uncertain = True
+    finally:
+        if environment["wakeup_attempted"] and not uncertain:
+            try:
+                # Finish one bounded restoration despite repeated graceful signals.
+                for signum in handlers:
+                    signal.signal(signum, signal.SIG_IGN)
+                current = collect_environment(request["bus"], request["addresses"])
+                if (current.get("boot_id") != request["expected_boot_id"]
+                        or current.get("adapter_fingerprint") != request["expected_adapter_fingerprint"]
+                        or current.get("adapter_present") is not True
+                        or current.get("access_allowed") is not True
+                        or current.get("combined_transfer_supported") is not True
+                        or current.get("driver_bound", {}).get(str(request["address"])) is not False
+                        or read(0x19, 4, restoration_deadline) != [divider, configuration, gyro, accel]):
+                    raise SamplingFailure("state_changed", "Restoration prerequisites changed")
+                current_control, current_power, current_power2 = read(0x6a, 3, restoration_deadline)
+                if (current_control, current_power2) != (control, power2):
+                    raise SamplingFailure("state_changed", "Another sensor configuration cannot be overwritten")
+                if current_power not in (original, original & ~0x40):
+                    raise SamplingFailure("state_changed", "Another power setting cannot be overwritten")
+                if current_power != original:
+                    write_power(original, restoration_deadline)
+                restored = read(0x6b, 1, restoration_deadline)[0]
+                environment["restored_pwr_mgmt_1"] = restored
+                environment["restoration_confirmed"] = restored == original
+            except BaseException:
+                environment["restoration_confirmed"] = False
+        for signum, handler in handlers.items():
+            signal.signal(signum, handler)
+    if uncertain or environment["restoration_confirmed"] is not True:
+        return response("error", "remote_state_unknown", "Remote completion or sensor restoration is unconfirmed",
+                        environment, True)
+    if failure:
+        return response("blocked" if failure.code in ("policy_denied", "state_changed") else "error",
+                        failure.code, failure.message, environment)
+    return response(observations=environment)
+
+
 def dispatch(request):
     validate_request(request)
     if request["op"] == "inspect_target":
         return inspect_target()
     if request["op"] == "inspect_i2c_environment":
         return inspect_i2c_environment(request)
+    if request["op"] == "sample_sensor_data":
+        return sample_sensor_data(request)
     return read_device_identity(request)
 
 
@@ -260,7 +417,7 @@ def resource_usage(started):
     """Linux probe + one waited transfer child's conservative RSS bound.
 
     RUSAGE_CHILDREN is the largest waited child's peak, not a tree total.
-    This probe launches at most one child. SSH/shell/other services are outside
+    This probe runs at most one child at a time. SSH/shell/other services are outside
     this measurement; do not present it as system-wide incremental memory.
     """
     if sys.platform != "linux":

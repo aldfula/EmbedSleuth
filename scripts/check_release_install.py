@@ -58,8 +58,30 @@ async def check(root):
     assert not (workspace / ".embedsleuth-hook-state").exists()
     assert all((Path(sys.executable).parent / name).is_file()
                for name in ("embedsleuth-mcp", "embedsleuth-hook", "embedsleuth-setup"))
+    in_place = "not_in_this_release"
+    if tuple(map(int, embedsleuth.__version__.split("."))) >= (0, 2, 0):
+        assert (Path(sys.executable).parent / "embedsleuth-approve-sampling").is_file()
+        project = root / "existing-project"
+        project.mkdir()
+        (project / "README.md").write_text("Original project\n")
+        (project / ".codex").mkdir()
+        (project / ".codex/config.toml").write_text('[mcp_servers.other]\ncommand="other"\n')
+        (project / ".codex/config.toml").chmod(0o600)
+        command = [str(Path(sys.executable).parent / "embedsleuth-setup"), "--in-place",
+                   "--directory", str(project), "--config", str(config)]
+        dry = subprocess.run(command + ["--dry-run"], check=True, capture_output=True, text=True, timeout=10)
+        assert json.loads(dry.stdout)["changed_files"] and not (project / ".embedsleuth").exists()
+        subprocess.run(command, check=True, capture_output=True, text=True, timeout=10)
+        again = subprocess.run(command, check=True, capture_output=True, text=True, timeout=10)
+        assert json.loads(again.stdout)["changed_files"] == []
+        assert (project / "README.md").read_text() == "Original project\n"
+        settings = tomllib.loads((project / ".codex/config.toml").read_text())
+        assert settings["mcp_servers"]["other"]["command"] == "other"
+        assert settings["mcp_servers"]["embedsleuth"]["command"] == sys.executable
+        in_place = "pass"
     return {"installed_version": embedsleuth.__version__, "standalone_setup": "pass", "mcp_tools": len(tools),
             "packaged_skill": "pass", "hook_commands": 3, "registered_targets": 0,
+            "in_place_setup": in_place,
             "device_checks": 0, "model_turns": 0, "hook_trust_granted": False}
 
 

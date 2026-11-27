@@ -5,7 +5,7 @@ from typing import Literal
 from embedsleuth.contracts import Contract, I2CAddress, Identifier, Mode, RunState
 from embedsleuth.profiles import ComponentProfile
 
-POLICY_VERSION = "0.1.0"
+POLICY_VERSION = "0.2.0"
 
 
 class IdentityReadContext(Contract):

@@ -31,7 +31,7 @@ MAX_CALLS = 64
 MAX_CLEANUP_CALLS = 16
 MAX_RUNS = 8
 TERMINAL = {"reported", "blocked", "expired", "cancelled"}
-REMOTE = {"inspect_target", "inspect_i2c_environment", "read_device_identity"}
+REMOTE = {"inspect_target", "inspect_i2c_environment", "read_device_identity", "sample_sensor_data"}
 REPAIR = ("EmbedSleuth could not verify closure of this turn's diagnostic records. "
           "Use finalize_report/get_report for existing evidence, or explain the interruption "
           "and unresolved limitations. Do not repeat hardware checks to satisfy this hook.")
@@ -156,7 +156,7 @@ class HookChecks:
             state = store.load_state(run_id)
             target = TargetRegistry(config.targets).get(state["target_id"])
             if (state["run_id"] != run_id or state["profile_id"] != target.profile_id
-                    or state["mode"] not in {"read_only", "passive"}):
+                    or state["mode"] not in {"read_only", "passive", "sensor_check"}):
                 raise ValueError("invalid run binding")
             yield store, state
             if store.load_state(run_id) != state:
@@ -252,6 +252,12 @@ class HookChecks:
             elif tool == "evaluate_findings":
                 if value != [json.loads(item.model_dump_json()) for item in report.findings]:
                     raise ValueError("findings differ")
+            elif tool == "prepare_sensor_sampling":
+                saved = state.get("sampling_plan") or {}
+                expected = {"run_id": run_id, "plan_id": saved.get("plan_id"),
+                            "plan": saved.get("plan"), "approval_required": True}
+                if value != expected:
+                    raise ValueError("sampling plan differs")
             elif value != json.loads(report.model_dump_json()):
                 # Concurrent cancellation can acknowledge a marker before a
                 # worker closes its report. Preserve that response and warn.
@@ -343,7 +349,18 @@ class HookChecks:
                 for run_id in entry["runs"]:
                     with self.snapshot(run_id, config) as (store, state):
                         report = self.report(store, state)
-                        if state["state"] not in TERMINAL or state.get("pending_operation"):
+                        from embedsleuth.sampling import plan_identifier, procedure
+                        saved = state.get("sampling_plan") or {}
+                        plan = saved.get("plan") or {}
+                        waiting = (state["mode"] == "sensor_check" and report.outcome == "partial"
+                            and state["state"] in ("sampling_planned", "probe_ready", "identified")
+                            and state["remote_state"] == "idle" and saved.get("consumed") is False
+                            and plan.get("run_id") == run_id and plan.get("target_id") == state["target_id"]
+                            and plan.get("procedure") == procedure()
+                            and saved.get("plan_id") == plan_identifier(plan))
+                        # Closing a turn while awaiting a human is not approval,
+                        # a freshness renewal or permission for another probe.
+                        if (state["state"] not in TERMINAL and not waiting) or state.get("pending_operation"):
                             raise ValueError("unclosed run")
                         for record in report.evidence:
                             self.audit(store, state, record.result)

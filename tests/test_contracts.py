@@ -57,7 +57,7 @@ def test_unknown_tool_cannot_be_executed():
 
 def test_tool_catalog_exports_closed_json_schemas():
     schemas = tool_input_schemas()
-    assert len(schemas) == 9
+    assert len(schemas) == 11
     assert all(schema["additionalProperties"] is False for schema in schemas.values())
     assert schemas["read_device_identity"]["properties"]["address"]["minimum"] == 8
 

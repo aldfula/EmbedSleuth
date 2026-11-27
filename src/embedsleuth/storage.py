@@ -206,6 +206,17 @@ class RunStore:
             os.close(fd)
             raise
 
+    @classmethod
+    def open_existing_writer(cls, root: str | os.PathLike[str]) -> RunStore:
+        """Open an existing private store for locked operator control writes.
+
+        Unlike construction, this does not create a store or recover unrelated
+        runs. Callers must take the normal target/run locks before changes.
+        """
+        writer = cls.open_reader(root)
+        writer._read_only = False
+        return writer
+
     def close(self) -> None:
         if self._root_fd >= 0:
             os.close(self._root_fd)

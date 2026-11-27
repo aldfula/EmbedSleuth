@@ -26,7 +26,7 @@ def body(result):
 
 
 @pytest.mark.parametrize("mode", ["auto", "legacy"])
-def test_sdk_initialization_and_exact_nine_tool_schemas(make_harness, mode):
+def test_sdk_initialization_and_exact_tool_schemas(make_harness, mode):
     h = make_harness()
 
     async def scenario():
@@ -35,7 +35,7 @@ def test_sdk_initialization_and_exact_nine_tool_schemas(make_harness, mode):
             assert {tool.name: tool.input_schema for tool in tools} == tool_input_schemas()
             for tool in tools:
                 assert tool.output_schema == OUTPUT_SCHEMA
-                assert tool.annotations.destructive_hint is False
+                assert tool.annotations.destructive_hint is (tool.name == "sample_sensor_data")
                 assert tool.annotations.read_only_hint is (tool.name == "get_component_profile")
             profile = body(await client.call_tool("get_component_profile", {"profile_id": "mpu6050"}))
             assert profile["result"]["profile_id"] == "mpu6050"

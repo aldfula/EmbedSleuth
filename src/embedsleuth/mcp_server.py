@@ -32,13 +32,15 @@ from embedsleuth.transport import ParamikoTransport
 
 
 LOG = logging.getLogger(__name__)
-REMOTE_TOOLS = frozenset({"inspect_target", "inspect_i2c_environment", "read_device_identity"})
+REMOTE_TOOLS = frozenset({"inspect_target", "inspect_i2c_environment", "read_device_identity", "sample_sensor_data"})
 DESCRIPTIONS = {
     "get_component_profile": "Load the reviewed component profile and datasheet references; no device access.",
     "start_diagnosis": "Start a session for a locally registered target_id. Default read_only; passive skips sensor IO.",
     "inspect_target": "Inspect the registered SSH target and bind board, boot and verified host key evidence.",
     "inspect_i2c_environment": "Inspect the registered I2C adapter and prerequisites without sensor transfers.",
     "read_device_identity": "Read only the reviewed identity register after core prerequisites pass. Reuse operation_id for replay; never automatically retry errors.",
+    "prepare_sensor_sampling": "Prepare a bounded sensor snapshot and conditional wake/restore plan. No device access; requires an explicit sensor_check run and matched identity. A local operator must approve the plan outside MCP.",
+    "sample_sensor_data": "Execute one locally approved sensor plan: bounded snapshots, conditional SLEEP-bit clearing and confirmed restoration. Never creates approval or automatically retries. Restore/transport uncertainty quarantines the target.",
     "evaluate_findings": "Evaluate deterministic rules from this run's recorded evidence; no device access.",
     "finalize_report": "Finalize recorded evidence and optional AI hypotheses with validated evidence references.",
     "get_report": "Recover and retrieve the current report. Partial/interrupted does not mean sensor failure.",
@@ -189,8 +191,8 @@ def create_server(core: DiagnosticCore) -> Server:
             Tool(name=name, description=DESCRIPTIONS[name], input_schema=schema,
                  output_schema=OUTPUT_SCHEMA, annotations=ToolAnnotations(
                      read_only_hint=name == "get_component_profile",
-                     destructive_hint=False,
-                     idempotent_hint=name in {"get_component_profile", "read_device_identity", "evaluate_findings", "get_report", "cancel_diagnosis"},
+                     destructive_hint=name == "sample_sensor_data",
+                     idempotent_hint=name in {"get_component_profile", "read_device_identity", "sample_sensor_data", "evaluate_findings", "get_report", "cancel_diagnosis"},
                      open_world_hint=name in REMOTE_TOOLS,
                  ))
             for name, schema in tool_input_schemas().items()

@@ -80,7 +80,7 @@ def test_production_stdio_handshake_tools_errors_and_clean_exit(tmp_path, ending
     with child_process([sys.executable, "-I", "-m", "embedsleuth.mcp_server", "--config", str(config)]) as process:
         initialize(process)
         send(process, {"id": 1, "method": "tools/list"})
-        assert len(receive(process, 1)["result"]["tools"]) == 9
+        assert len(receive(process, 1)["result"]["tools"]) == 11
         assert tool(process, 2, "get_component_profile", {"profile_id": "mpu6050"})["isError"] is False
         error = tool(process, 3, "start_diagnosis", {"target_id": "unregistered", "profile_id": "mpu6050"})
         assert error["isError"] is True
@@ -170,7 +170,7 @@ def test_real_sdk_client_negotiates_with_production_stdio_process(tmp_path, mode
             "-I", "-m", "embedsleuth.mcp_server", "--config", str(config),
         ])
         async with Client(parameters, mode=mode, read_timeout_seconds=3) as client:
-            assert len((await client.list_tools()).tools) == 9
+            assert len((await client.list_tools()).tools) == 11
             response = await client.call_tool("get_component_profile", {"profile_id": "mpu6050"})
             assert response.is_error is False
             assert response.structured_content["result"]["profile_id"] == "mpu6050"

@@ -47,3 +47,27 @@ inspect_target의 board_model·boot_id·host_key_fingerprint는 실제 결합 �
 > lab-pi / 실제 run_id / read_only / 보고서 outcome. 주소 0x68의 레지스터 0x75에서 0x68을 읽었다(실제 증거 ID, 수집 시각). 코어는 기대 식별값 일치로 판정했다. 정품·측정 정확도·전기 조건은 확인하지 않았다.
 
 검사가 실패한 경우에는 위 성공 예 대신 실행 오류와 미확인 범위를 설명한다. 다음 조치로 전원 차단 후 배선 확인이나 운영자에게 접근 환경 확인을 제안할 수 있으나, 과전압·단락 실험이나 자동 설정 변경을 제안하지 않는다.
+
+## 센서 점검 계획과 승인
+
+v0.2.0의 명시적 `sensor_check` 실행에서 환경 조사와 식별 일치 뒤에만 사용할 수 있다.
+
+```json
+{"tool":"prepare_sensor_sampling","arguments":{"run_id":"$run_id","bus_ref":"bus-1","address":104}}
+```
+
+응답의 plan_id와 plan을 사용자에게 설명한다. `approval_required=true`는 아직 승인됐다는 뜻이 아니다. 사용자는 자신의 터미널에서 실제 등록 파일 경로를 사용해 아래 명령을 실행하고 화면의 계획 식별자를 직접 입력한다. AI는 등록 경로를 찾아 읽거나 승인 입력을 대신 수행하지 않는다.
+
+```text
+embedsleuth-approve-sampling --config /ABSOLUTE/PATH/targets.json --run-id ACTUAL_RUN_ID --plan-id ACTUAL_PLAN_ID
+```
+
+승인 후 필요한 경우 `inspect_i2c_environment`로 신선도를 갱신한다. 계획·전체 실행의 만료와 예산은 계속 적용된다.
+
+```json
+{"tool":"sample_sensor_data","arguments":{"run_id":"$run_id","plan_id":"$plan_id","operation_id":"sensor-snapshots-1"}}
+```
+
+MCP에 approved·레지스터·길이·샘플 수·셸 명령은 전달하지 않는다. 계획은 5개 고정 14바이트 burst, 50ms 간격과 조건부 SLEEP 해제·원래 PWR_MGMT_1 복원에 한정된다. 센서가 이미 활성 상태이면 설정 쓰기를 생략한다. 비지원 전원/축/클록/인터럽트/FIFO/DMP/self-test 설정은 초기화로 해결하지 않고 중단한다.
+
+성공 증거의 configuration, samples, decoded, wakeup_attempted, restoration_confirmed를 읽는다. decoded의 가속도는 g, 각속도는 °/s, 온도는 칩 내부 °C이며 정밀 주변 온도가 아니다. 디지털 범위·반복값 경고는 보정된 정상/고장 판정이 아니다. acquisition의 assessment=pass는 짧은 획득·복원 확인에 대한 판정이다. 전원 차단·전송 완료 불명확·복원 실패는 정상 복원을 주장하지 않으며 코어가 격리할 수 있다. 오류 뒤 새 operation_id로 다시 실행하지 않는다.
